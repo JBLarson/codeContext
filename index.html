@@ -180,7 +180,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>GitHub codeContext</h1>
+    <h1>GitHub Code Context Generator V2</h1>
 
     <div id="patInputGroup" class="form-group" style="display:none">
       <label for="githubPat">GitHub Personal Access Token (PAT):</label>
@@ -265,7 +265,6 @@
       return h;
     }
 
-    // Immediately use GITHUB_APP_TOKEN if present, otherwise show manual PAT
     if (typeof GITHUB_APP_TOKEN !== 'undefined' && GITHUB_APP_TOKEN) {
       token = GITHUB_APP_TOKEN;
       patInputGroup.style.display = 'none';
@@ -396,31 +395,65 @@
       container.appendChild(ul);
     }
 
+    function isImageFile(name) {
+      return /\.(png|jpe?g|gif|bmp|svg|webp|ico|tif|tiff)$/i.test(name);
+    }
+
     function nodeToElement(n) {
       const li = document.createElement('li');
-      li.className = `file-tree-node node-type-${n.type}`; li.dataset.nodePath = n.path;
-      const d = document.createElement('div'); d.className='node-content';
-      if(n.type==='dir'){
-        const t = document.createElement('span'); t.className='dir-toggle'; t.textContent='►';
-        t.onclick = e=>{ e.stopPropagation(); const sub = li.querySelector('ul'); if(!sub) return;
-          const show = sub.style.display!=='block'; sub.style.display=show?'block':'none'; t.classList.toggle('open',show);
+      li.className = `file-tree-node node-type-${n.type}`;
+      li.dataset.nodePath = n.path;
+      const d = document.createElement('div');
+      d.className = 'node-content';
+
+      if (n.type === 'dir') {
+        const t = document.createElement('span');
+        t.className = 'dir-toggle';
+        t.textContent = '►';
+        t.onclick = e => {
+          e.stopPropagation();
+          const sub = li.querySelector('ul');
+          if (!sub) return;
+          const show = sub.style.display !== 'block';
+          sub.style.display = show ? 'block' : 'none';
+          t.classList.toggle('open', show);
         };
         d.appendChild(t);
       }
-      const cb = document.createElement('input');
-      cb.type='checkbox'; cb.value=n.path; cb.dataset.nodeType=n.type;
-      cb.id=`cb-${n.path.replace(/[^A-Za-z0-9_.-]/g,'_')}`;
-      const lbl = document.createElement('label');
-      lbl.htmlFor=cb.id; lbl.textContent=n.name;
-      if(n.type==='dir') lbl.className='dir-label';
-      d.appendChild(cb); d.appendChild(lbl);
-      if(n.type==='file'){
-        const ld = document.createElement('span'); ld.className='loading-indicator'; ld.textContent='loading...';
-        d.appendChild(ld); cb.onchange=onFileChange;
-      } else cb.onchange=onDirChange;
+
+      if (n.type === 'file' && isImageFile(n.name)) {
+        const lbl = document.createElement('label');
+        lbl.textContent = n.name;
+        lbl.style.opacity = '0.6';
+        d.appendChild(lbl);
+      } else {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = n.path;
+        cb.dataset.nodeType = n.type;
+        cb.id = `cb-${n.path.replace(/[^A-Za-z0-9_.-]/g,'_')}`;
+        const lbl = document.createElement('label');
+        lbl.htmlFor = cb.id;
+        lbl.textContent = n.name;
+        if (n.type === 'dir') lbl.className = 'dir-label';
+        d.appendChild(cb);
+        d.appendChild(lbl);
+        if (n.type === 'file') {
+          const ld = document.createElement('span');
+          ld.className = 'loading-indicator';
+          ld.textContent = 'loading...';
+          d.appendChild(ld);
+          cb.onchange = onFileChange;
+        } else {
+          cb.onchange = onDirChange;
+        }
+      }
+
       li.appendChild(d);
-      if(n.type==='dir'&&n.children){
-        const sub = document.createElement('ul'); sub.style.display='none';
+
+      if (n.type === 'dir' && n.children) {
+        const sub = document.createElement('ul');
+        sub.style.display = 'none';
         Object.values(n.children).sort((a,b)=>{
           if(a.type==='dir'&&b.type==='file') return -1;
           if(a.type==='file'&&b.type==='dir') return 1;
@@ -449,7 +482,8 @@
     async function onDirChange(e){
       const dirCb=e.target, checked=dirCb.checked, li=dirCb.closest('.file-tree-node');
       const all = li.querySelectorAll('input[type="checkbox"]'), toFetch=[];
-      all.forEach(cb=>{ cb.checked=checked; cb.indeterminate=false;
+      all.forEach(cb=>{
+        cb.checked=checked; cb.indeterminate=false;
         if(checked&&cb.dataset.nodeType==='file'&&!fileCache[cb.value]) toFetch.push(cb.value);
       });
       if(toFetch.length){
