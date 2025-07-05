@@ -7,53 +7,175 @@
   <script src="token-config.js"></script>
   <style>
     :root {
-      --bg-color:#0B1D12;
-      --card-bg:#112B1A;
-      --primary-color:#E6F0EA;
-      --accent-color:#34D399;
-      --text-color:#A0B0A8;
-      --input-border:#2A5238;
-      --input-bg-color:#08140A;
-      --error-bg:#4d1f1f;
-      --error-text:#ffacac;
-      --loading-bg:#1A3824;
-      --warning-bg:#4a3b00;
-      --border-radius:8px;
-      --spacing:16px;
-      --font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+      /* Dark Green Theme */
+      --bg-color: #0B1D12;
+      --card-bg: #112B1A;
+      --primary-color: #E6F0EA;
+      --accent-color: #34D399;
+      --text-color: #A0B0A8;
+      --input-border: #2A5238;
+      --input-bg-color: #08140A;
+      --error-bg: #4d1f1f;
+      --error-text: #ffacac;
+      --loading-bg: #1A3824;
+      --warning-bg: #4a3b00;
+
+      --border-radius: 8px;
+      --spacing: 16px;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
     }
-    body{margin:0;padding:0;background-color:var(--bg-color);font-family:var(--font-family);color:var(--text-color);display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:40px 0;}
-    .container{width:90%;max-width:900px;margin:0 auto;padding:var(--spacing);background-color:var(--card-bg);border-radius:var(--border-radius);box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid var(--input-border);}
-    h1{margin:0 0 calc(var(--spacing)*1.5);font-size:24px;text-align:center;color:var(--primary-color);}
-    .form-group{margin-bottom:var(--spacing);}
-    label{display:block;margin-bottom:6px;font-weight:bold;font-size:14px;color:var(--primary-color);}
-    input[type="text"],input[type="password"],select,textarea{width:calc(100% - 22px);padding:10px;font-size:14px;border:1px solid var(--input-border);border-radius:var(--border-radius);background-color:var(--input-bg-color);color:var(--primary-color);font-family:inherit;transition:border-color .2s,background-color .2s;}
-    input:focus,select:focus,textarea:focus{border-color:var(--accent-color);background-color:#0E1E14;}
-    textarea{min-height:100px;resize:vertical;}
-    #outputMessage{min-height:250px;font-family:"SFMono-Regular",Consolas,monospace;}
-    .button-group{display:flex;gap:var(--spacing);margin:var(--spacing) 0;}
-    button{padding:10px 20px;font-size:14px;font-weight:bold;background-color:var(--accent-color);color:var(--bg-color);border:none;border-radius:var(--border-radius);cursor:pointer;transition:background-color .2s;}
-    button:hover{background-color:#2CB87E;}
-    button:disabled{background-color:#50685A;color:var(--text-color);cursor:not-allowed;}
-    #fileListContainer{max-height:300px;overflow-y:auto;padding:var(--spacing);background-color:var(--input-bg-color);border:1px solid var(--input-border);border-radius:var(--border-radius);}
-    #fileListContainer ul{list-style:none;padding-left:20px;margin:0;}
-    #fileListContainer ul.file-tree-root{padding-left:0;}
-    .file-tree-node{margin:4px 0;}
-    .node-content{display:flex;align-items:center;padding:4px 6px;border-radius:4px;transition:background-color .2s;}
-    .file-tree-node:hover>.node-content{background-color:#1A3824;}
-    .node-content input[type="checkbox"]{margin-right:8px;accent-color:var(--accent-color);cursor:pointer;position:relative;top:1px;}
-    .node-content label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;color:var(--text-color);line-height:1.4;cursor:pointer;}
-    .node-content label.dir-label{font-weight:500;color:var(--primary-color);}
-    .dir-toggle{width:1em;margin-right:6px;cursor:pointer;user-select:none;transition:transform .1s;color:var(--accent-color);}
-    .dir-toggle.open{transform:rotate(90deg);}
-    .file-tree-node.node-type-file .dir-toggle{display:none;}
-    .loading-indicator{margin-left:auto;padding-left:8px;font-size:12px;color:var(--accent-color);display:none;}
-    .file-tree-node.is-loading>.node-content .loading-indicator{display:inline!important;}
-    .message-area{margin-top:10px;padding:10px;border-radius:var(--border-radius);font-size:14px;text-align:center;}
-    .loading-message{background:var(--loading-bg);color:var(--accent-color);}
-    .error-message{background:var(--error-bg);color:var(--error-text);}
-    .warning-message{background:var(--warning-bg);color:var(--primary-color);text-align:left;font-size:12px;}
-    hr{border:none;border-top:1px solid var(--input-border);margin:calc(var(--spacing)*1.5) 0;}
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      font-family: var(--font-family);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 40px 0;
+    }
+    .container {
+      width: 90%;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: var(--spacing);
+      background-color: var(--card-bg);
+      border-radius: var(--border-radius);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      border: 1px solid var(--input-border);
+    }
+    h1 {
+      margin: 0 0 calc(var(--spacing)*1.5);
+      font-size: 24px;
+      text-align: center;
+      color: var(--primary-color);
+    }
+    .form-group { margin-bottom: var(--spacing); }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      font-size: 14px;
+      color: var(--primary-color);
+    }
+    input[type="text"],
+    input[type="password"],
+    select,
+    textarea {
+      width: calc(100% - 22px);
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid var(--input-border);
+      border-radius: var(--border-radius);
+      background-color: var(--input-bg-color);
+      color: var(--primary-color);
+      font-family: inherit;
+      transition: border-color .2s, background-color .2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent-color);
+      background-color: #0E1E14;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    #outputMessage { min-height: 250px; font-family: "SFMono-Regular", Consolas, monospace; }
+    .button-group {
+      display: flex;
+      gap: var(--spacing);
+      margin: var(--spacing) 0;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      background-color: var(--accent-color);
+      color: var(--bg-color);
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: background-color .2s;
+    }
+    button:hover { background-color: #2CB87E; }
+    button:disabled {
+      background-color: #50685A;
+      color: var(--text-color);
+      cursor: not-allowed;
+    }
+    #fileListContainer {
+      max-height: 300px;
+      overflow-y: auto;
+      padding: var(--spacing);
+      background-color: var(--input-bg-color);
+      border: 1px solid var(--input-border);
+      border-radius: var(--border-radius);
+    }
+    #fileListContainer ul {
+      list-style: none;
+      padding-left: 20px;
+      margin: 0;
+    }
+    #fileListContainer ul.file-tree-root { padding-left: 0; }
+    .file-tree-node { margin: 4px 0; }
+    .node-content {
+      display: flex;
+      align-items: center;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: background-color .2s;
+    }
+    .file-tree-node:hover > .node-content { background-color: #1A3824; }
+    .node-content input[type="checkbox"] {
+      margin-right: 8px;
+      accent-color: var(--accent-color);
+      cursor: pointer;
+      position: relative;
+      top: 1px;
+    }
+    .node-content label {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 14px;
+      color: var(--text-color);
+      line-height: 1.4;
+      cursor: pointer;
+    }
+    .node-content label.dir-label { font-weight: 500; color: var(--primary-color); }
+    .dir-toggle {
+      width:1em;
+      margin-right:6px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .1s;
+      color: var(--accent-color);
+    }
+    .dir-toggle.open { transform: rotate(90deg); }
+    .file-tree-node.node-type-file .dir-toggle { display: none; }
+    .loading-indicator {
+      margin-left:auto;
+      padding-left:8px;
+      font-size:12px;
+      color: var(--accent-color);
+      display: none;
+    }
+    .file-tree-node.is-loading > .node-content .loading-indicator { display:inline!important; }
+    .message-area {
+      margin-top:10px;
+      padding:10px;
+      border-radius:var(--border-radius);
+      font-size:14px;
+      text-align:center;
+    }
+    .loading-message { background: var(--loading-bg); color:var(--accent-color); }
+    .error-message   { background: var(--error-bg);   color:var(--error-text); }
+    .warning-message { background: var(--warning-bg); color:var(--primary-color); text-align:left; font-size:12px; }
+    hr {
+      border: none;
+      border-top: 1px solid var(--input-border);
+      margin: calc(var(--spacing)*1.5) 0;
+    }
   </style>
 </head>
 <body>
@@ -101,7 +223,7 @@
     </div>
 
     <div class="form-group">
-      <label for="outputMessage">Generated Context: <span id="counts">Word Count: 0 Character Count 0</span></label>
+      <label for="outputMessage">Generated Context:</label>
       <textarea id="outputMessage" readonly placeholder="Context will appear here…"></textarea>
     </div>
 
@@ -126,228 +248,215 @@
     let currentRepo = null;
     let fileCache = {};
     let token = null;
-    let selectionContext = '';
 
-    function showLoading(msg){statusMessages.innerHTML=`<div class="message-area loading-message">${msg}</div>`;}
-    function showError(msg){statusMessages.innerHTML=`<div class="message-area error-message">${msg}</div>`;}
-    function clearStatus(){statusMessages.innerHTML='';}
+    function showLoading(msg) {
+      statusMessages.innerHTML = `<div class="message-area loading-message">${msg}</div>`;
+    }
+    function showError(msg) {
+      statusMessages.innerHTML = `<div class="message-area error-message">${msg}</div>`;
+    }
+    function clearStatus() {
+      statusMessages.innerHTML = '';
+    }
 
-    function getHeaders(){
-      const h={'Accept':'application/vnd.github.v3+json'};
-      if(token)h['Authorization']=`Bearer ${token}`;
+    function getHeaders() {
+      const h = { 'Accept': 'application/vnd.github.v3+json' };
+      if (token) h['Authorization'] = `Bearer ${token}`;
       return h;
     }
 
-    if(typeof GITHUB_APP_TOKEN!=='undefined'&&GITHUB_APP_TOKEN){
-      token=GITHUB_APP_TOKEN;
-      patInputGroup.style.display='none';
-    }else{
-      patInputGroup.style.display='block';
-      githubPatInput.addEventListener('input',()=>{token=githubPatInput.value.trim()||null;});
-    }
-
-    function updateCounts(){
-      const text=outputMessage.value;
-      const wordCount=text.trim()?text.trim().split(/\s+/).length:0;
-      const characterCount=text.length;
-      document.getElementById('counts').textContent=`Word Count: ${wordCount} Character Count ${characterCount}`;
-    }
-
-    /* ---------- performance helpers ---------- */
-    function buildSelectionContext(){
-      const parts=[];
-      fileListContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb=>{
-        if(cb.dataset.nodeType==='file'&&fileCache[cb.value]){
-          parts.push(`\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`);
-        }
+    if (typeof GITHUB_APP_TOKEN !== 'undefined' && GITHUB_APP_TOKEN) {
+      token = GITHUB_APP_TOKEN;
+      patInputGroup.style.display = 'none';
+    } else {
+      patInputGroup.style.display = 'block';
+      githubPatInput.addEventListener('input', () => {
+        token = githubPatInput.value.trim() || null;
       });
-      selectionContext=parts.join('');
     }
 
-    function setOutputMessage(){
-      outputMessage.value=(userInstructions.value||'')+selectionContext;
-      updateCounts();
+    userInstructions.addEventListener('input', renderOutput);
+
+    function parseUrl(url) {
+      try {
+        const u = new URL(url);
+        if (u.hostname !== 'github.com') return null;
+        const parts = u.pathname.split('/').filter(p=>p);
+        if (parts.length<2) return null;
+        return { owner: parts[0], repo: parts[1] };
+      } catch {
+        return null;
+      }
     }
 
-    let typingTimer;
-    const DEBOUNCE_MS=500;
-    userInstructions.addEventListener('input',()=>{
-      clearTimeout(typingTimer);
-      typingTimer=setTimeout(setOutputMessage,DEBOUNCE_MS);
-    });
-    /* ---------------------------------------- */
-
-    function parseUrl(url){
-      try{
-        const u=new URL(url);
-        if(u.hostname!=='github.com')return null;
-        const parts=u.pathname.split('/').filter(p=>p);
-        if(parts.length<2)return null;
-        return{owner:parts[0],repo:parts[1]};
-      }catch{return null;}
+    async function fetchBranches(owner, repo) {
+      const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, { headers: getHeaders() });
+      if (!r.ok) throw new Error(r.statusText);
+      return (await r.json()).map(b=>b.name);
+    }
+    async function fetchDefaultBranch(owner,repo) {
+      const r = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: getHeaders() });
+      if (!r.ok) throw new Error(r.statusText);
+      const j = await r.json();
+      return j.default_branch || 'main';
     }
 
-    async function fetchBranches(owner,repo){
-      const r=await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`,{headers:getHeaders()});
-      if(!r.ok)throw new Error(r.statusText);
-      return(await r.json()).map(b=>b.name);
-    }
-    async function fetchDefaultBranch(owner,repo){
-      const r=await fetch(`https://api.github.com/repos/${owner}/${repo}`,{headers:getHeaders()});
-      if(!r.ok)throw new Error(r.statusText);
-      const j=await r.json();
-      return j.default_branch||'main';
-    }
-
-    fetchFilesBtn.addEventListener('click',async()=>{
+    fetchFilesBtn.addEventListener('click', async () => {
       clearStatus();
-      const url=repoUrlInput.value.trim();
-      const info=parseUrl(url);
-      if(!info){showError('Invalid GitHub URL.');return;}
+      const url = repoUrlInput.value.trim();
+      const info = parseUrl(url);
+      if (!info) { showError('Invalid GitHub URL.'); return; }
 
       showLoading('Loading branches…');
-      branchSelect.disabled=true;
-      try{
-        const[branches,def]=await Promise.all([
-          fetchBranches(info.owner,info.repo),
-          fetchDefaultBranch(info.owner,info.repo)
+      branchSelect.disabled = true;
+      try {
+        const [branches, def] = await Promise.all([
+          fetchBranches(info.owner, info.repo),
+          fetchDefaultBranch(info.owner, info.repo)
         ]);
-        branchSelect.innerHTML=branches.map(b=>`<option value="${b}"${b===def?' selected':''}>${b}</option>`).join('');
-        branchSelect.disabled=false;
-        currentRepo={...info,branch:branchSelect.value};
-        fileCache={};
+        branchSelect.innerHTML = branches
+          .map(b=>`<option value="${b}"${b===def?' selected':''}>${b}</option>`)
+          .join('');
+        branchSelect.disabled = false;
+        currentRepo = { ...info, branch: branchSelect.value };
+        fileCache = {};
         loadTree();
-      }catch(e){
+      } catch (e) {
         showError(`Branch error: ${e.message}`);
-      }finally{
+      } finally {
         clearStatus();
       }
     });
 
-    branchSelect.addEventListener('change',()=>{
-      if(!currentRepo)return;
-      currentRepo.branch=branchSelect.value;
-      fileCache={};
+    branchSelect.addEventListener('change', () => {
+      if (!currentRepo) return;
+      currentRepo.branch = branchSelect.value;
+      fileCache = {};
       loadTree();
     });
 
-    async function loadTree(){
+    async function loadTree() {
       showLoading(`Fetching tree (${currentRepo.branch})…`);
-      fetchFilesBtn.disabled=true;
-      fileListContainer.innerHTML='<p>Fetching files…</p>';
-      try{
-        const r=await fetch(`https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/git/trees/${currentRepo.branch}?recursive=1`,{headers:getHeaders()});
-        if(!r.ok)throw new Error(r.statusText);
-        const data=await r.json();
-        fileListContainer.innerHTML='';
-        if(data.truncated){
-          fileListContainer.innerHTML=`<div class="message-area warning-message">File list truncated.</div>`;
+      fetchFilesBtn.disabled = true;
+      fileListContainer.innerHTML = '<p>Fetching files…</p>';
+      try {
+        const r = await fetch(
+          `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/git/trees/${currentRepo.branch}?recursive=1`,
+          { headers:getHeaders() }
+        );
+        if (!r.ok) throw new Error(r.statusText);
+        const data = await r.json();
+        fileListContainer.innerHTML = '';
+        if (data.truncated) {
+          fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated.</div>`;
         }
-        if(!data.tree||!data.tree.length){
-          fileListContainer.innerHTML+='<p>No files found.</p>';
-        }else{
-          const tree=buildTree(data.tree);
-          renderTree(tree,fileListContainer);
+        if (!data.tree || !data.tree.length) {
+          fileListContainer.innerHTML += '<p>No files found.</p>';
+        } else {
+          const tree = buildTree(data.tree);
+          renderTree(tree, fileListContainer);
         }
-      }catch(e){
+      } catch (e) {
         showError(`Fetch error: ${e.message}`);
-        fileListContainer.innerHTML='<p>Could not fetch files.</p>';
-      }finally{
+        fileListContainer.innerHTML = '<p>Could not fetch files.</p>';
+      } finally {
         clearStatus();
-        fetchFilesBtn.disabled=false;
-        buildSelectionContext();
-        setOutputMessage();
+        fetchFilesBtn.disabled = false;
+        renderOutput();
       }
     }
 
-    function buildTree(items){
-      const root={children:{}};
+    function buildTree(items) {
+      const root = { children: {} };
       items.filter(i=>i.type==='blob'||i.type==='tree')
         .sort((a,b)=>a.path.localeCompare(b.path))
         .forEach(i=>{
-          const parts=i.path.split('/');
-          let cur=root.children,acc=[];
+          const parts = i.path.split('/');
+          let cur = root.children, acc = [];
           parts.forEach((p,idx)=>{
             acc.push(p);
-            const path=acc.join('/');
-            const isFile=idx===parts.length-1&&i.type==='blob';
-            if(!cur[p])cur[p]={name:p,type:isFile?'file':'dir',path,children:isFile?null:{}};
-            if(cur[p].type==='dir')cur=cur[p].children;
+            const path = acc.join('/');
+            const isFile = idx===parts.length-1 && i.type==='blob';
+            if (!cur[p]) cur[p] = { name:p, type:isFile?'file':'dir', path, children:isFile?null:{} };
+            if (cur[p].type==='dir') cur = cur[p].children;
           });
         });
       return root;
     }
 
-    function renderTree(node,container){
-      if(!node.children)return;
-      const ul=document.createElement('ul');ul.className='file-tree-root';
+    function renderTree(node, container) {
+      if (!node.children) return;
+      const ul = document.createElement('ul'); ul.className = 'file-tree-root';
       Object.values(node.children).sort((a,b)=>{
-        if(a.type==='dir'&&b.type==='file')return-1;
-        if(a.type==='file'&&b.type==='dir')return 1;
+        if(a.type==='dir'&&b.type==='file') return -1;
+        if(a.type==='file'&&b.type==='dir') return 1;
         return a.name.localeCompare(b.name);
       }).forEach(c=>ul.appendChild(nodeToElement(c)));
       container.appendChild(ul);
     }
 
-    function isImageFile(name){return/\.(png|jpe?g|gif|bmp|svg|webp|ico|tif|tiff)$/i.test(name);}
+    function isImageFile(name) {
+      return /\.(png|jpe?g|gif|bmp|svg|webp|ico|tif|tiff)$/i.test(name);
+    }
 
-    function nodeToElement(n){
-      const li=document.createElement('li');
-      li.className=`file-tree-node node-type-${n.type}`;
-      li.dataset.nodePath=n.path;
-      const d=document.createElement('div');d.className='node-content';
+    function nodeToElement(n) {
+      const li = document.createElement('li');
+      li.className = `file-tree-node node-type-${n.type}`;
+      li.dataset.nodePath = n.path;
+      const d = document.createElement('div');
+      d.className = 'node-content';
 
-      if(n.type==='dir'){
-        const t=document.createElement('span');
-        t.className='dir-toggle';
-        t.textContent='►';
-        t.onclick=e=>{
+      if (n.type === 'dir') {
+        const t = document.createElement('span');
+        t.className = 'dir-toggle';
+        t.textContent = '►';
+        t.onclick = e => {
           e.stopPropagation();
-          const sub=li.querySelector('ul');
-          if(!sub)return;
-          const show=sub.style.display!=='block';
-          sub.style.display=show?'block':'none';
-          t.classList.toggle('open',show);
+          const sub = li.querySelector('ul');
+          if (!sub) return;
+          const show = sub.style.display !== 'block';
+          sub.style.display = show ? 'block' : 'none';
+          t.classList.toggle('open', show);
         };
         d.appendChild(t);
       }
 
-      if(n.type==='file'&&isImageFile(n.name)){
-        const lbl=document.createElement('label');
-        lbl.textContent=n.name;
-        lbl.style.opacity='0.6';
+      if (n.type === 'file' && isImageFile(n.name)) {
+        const lbl = document.createElement('label');
+        lbl.textContent = n.name;
+        lbl.style.opacity = '0.6';
         d.appendChild(lbl);
-      }else{
-        const cb=document.createElement('input');
-        cb.type='checkbox';
-        cb.value=n.path;
-        cb.dataset.nodeType=n.type;
-        cb.id=`cb-${n.path.replace(/[^A-Za-z0-9_.-]/g,'_')}`;
-        const lbl=document.createElement('label');
-        lbl.htmlFor=cb.id;
-        lbl.textContent=n.name;
-        if(n.type==='dir')lbl.className='dir-label';
+      } else {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = n.path;
+        cb.dataset.nodeType = n.type;
+        cb.id = `cb-${n.path.replace(/[^A-Za-z0-9_.-]/g,'_')}`;
+        const lbl = document.createElement('label');
+        lbl.htmlFor = cb.id;
+        lbl.textContent = n.name;
+        if (n.type === 'dir') lbl.className = 'dir-label';
         d.appendChild(cb);
         d.appendChild(lbl);
-        if(n.type==='file'){
-          const ld=document.createElement('span');
-          ld.className='loading-indicator';
-          ld.textContent='loading...';
+        if (n.type === 'file') {
+          const ld = document.createElement('span');
+          ld.className = 'loading-indicator';
+          ld.textContent = 'loading...';
           d.appendChild(ld);
-          cb.onchange=onFileChange;
-        }else{
-          cb.onchange=onDirChange;
+          cb.onchange = onFileChange;
+        } else {
+          cb.onchange = onDirChange;
         }
       }
 
       li.appendChild(d);
 
-      if(n.type==='dir'&&n.children){
-        const sub=document.createElement('ul');
-        sub.style.display='none';
+      if (n.type === 'dir' && n.children) {
+        const sub = document.createElement('ul');
+        sub.style.display = 'none';
         Object.values(n.children).sort((a,b)=>{
-          if(a.type==='dir'&&b.type==='file')return-1;
-          if(a.type==='file'&&b.type==='dir')return 1;
+          if(a.type==='dir'&&b.type==='file') return -1;
+          if(a.type==='file'&&b.type==='dir') return 1;
           return a.name.localeCompare(b.name);
         }).forEach(c=>sub.appendChild(nodeToElement(c)));
         li.appendChild(sub);
@@ -356,57 +465,77 @@
     }
 
     async function onFileChange(e){
-      const cb=e.target,path=cb.value,li=cb.closest('.file-tree-node');
-      if(cb.checked&&!fileCache[path]){
+      const cb=e.target, path=cb.value, li=cb.closest('.file-tree-node');
+      if(cb.checked && !fileCache[path]){
         li.classList.add('is-loading');
-        try{fileCache[path]=await fetchContent(path);}catch{cb.checked=false;}finally{li.classList.remove('is-loading');}
+        try {
+          fileCache[path] = await fetchContent(path);
+        } catch {
+          cb.checked=false;
+        } finally {
+          li.classList.remove('is-loading');
+        }
       }
-      updateParents(cb);
-      buildSelectionContext();
-      setOutputMessage();
+      renderOutput(); updateParents(cb);
     }
 
     async function onDirChange(e){
-      const dirCb=e.target,checked=dirCb.checked,li=dirCb.closest('.file-tree-node');
-      const all=li.querySelectorAll('input[type="checkbox"]'),toFetch=[];
+      const dirCb=e.target, checked=dirCb.checked, li=dirCb.closest('.file-tree-node');
+      const all = li.querySelectorAll('input[type="checkbox"]'), toFetch=[];
       all.forEach(cb=>{
-        cb.checked=checked;cb.indeterminate=false;
-        if(checked&&cb.dataset.nodeType==='file'&&!fileCache[cb.value])toFetch.push(cb.value);
+        cb.checked=checked; cb.indeterminate=false;
+        if(checked&&cb.dataset.nodeType==='file'&&!fileCache[cb.value]) toFetch.push(cb.value);
       });
       if(toFetch.length){
         showLoading(`Fetching ${toFetch.length} files…`);
-        await Promise.all(toFetch.map(async p=>{try{fileCache[p]=await fetchContent(p);}catch{}}));
+        await Promise.all(toFetch.map(async p=>{
+          try { fileCache[p]=await fetchContent(p); }
+          catch{/*ignore*/}
+        }));
         clearStatus();
       }
-      updateParents(dirCb);
-      buildSelectionContext();
-      setOutputMessage();
+      renderOutput(); updateParents(dirCb);
     }
 
     function updateParents(cb){
       let ul=cb.closest('ul');
-      while(ul&&!ul.classList.contains('file-tree-root')){
-        const pLi=ul.parentElement,pCb=pLi.querySelector('> .node-content input[type="checkbox"]');
-        const children=pLi.querySelectorAll('> ul input[type="checkbox"]');
-        const total=children.length,checked=[...children].filter(x=>x.checked).length;
-        if(checked===0){pCb.checked=false;pCb.indeterminate=false;}
-        else if(checked===total){pCb.checked=true;pCb.indeterminate=false;}
-        else{pCb.checked=false;pCb.indeterminate=true;}
+      while(ul && !ul.classList.contains('file-tree-root')){
+        const pLi=ul.parentElement, pCb=pLi.querySelector('> .node-content input[type="checkbox"]');
+        const children= pLi.querySelectorAll('> ul input[type="checkbox"]');
+        const total=children.length, checked=[...children].filter(x=>x.checked).length;
+        if(checked===0){ pCb.checked=false; pCb.indeterminate=false; }
+        else if(checked===total){ pCb.checked=true; pCb.indeterminate=false; }
+        else{ pCb.checked=false; pCb.indeterminate=true; }
         ul=pLi.closest('ul');
       }
     }
 
     async function fetchContent(path){
-      const r=await fetch(`https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${currentRepo.branch}`,{headers:getHeaders()});
-      if(!r.ok)throw new Error(r.statusText);
-      const j=await r.json();
-      if(j.encoding!=='base64')throw new Error('Bad encoding');
+      const r = await fetch(
+        `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${currentRepo.branch}`,
+        { headers:getHeaders() }
+      );
+      if(!r.ok) throw new Error(r.statusText);
+      const j = await r.json();
+      if(j.encoding!=='base64') throw new Error('Bad encoding');
       return atob(j.content);
     }
 
-    copyBtn.addEventListener('click',()=>{
-      if(!outputMessage.value){showError('Nothing to copy.');setTimeout(clearStatus,2000);return;}
-      navigator.clipboard.writeText(outputMessage.value).then(()=>{copyBtn.textContent='Copied!';setTimeout(()=>copyBtn.textContent='Copy to Clipboard',1500);}).catch(()=>{showError('Copy failed.');});
+    function renderOutput(){
+      let out = userInstructions.value || '';
+      fileListContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb=>{
+        if(cb.dataset.nodeType==='file'&&fileCache[cb.value]){
+          out += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+        }
+      });
+      outputMessage.value = out;
+    }
+
+    copyBtn.addEventListener('click', ()=>{
+      if(!outputMessage.value){ showError('Nothing to copy.'); setTimeout(clearStatus,2000); return; }
+      navigator.clipboard.writeText(outputMessage.value)
+        .then(_=>{ copyBtn.textContent='Copied!'; setTimeout(_=>copyBtn.textContent='Copy to Clipboard',1500); })
+        .catch(_=>{ showError('Copy failed.'); });
     });
   });
   </script>
