@@ -60,6 +60,34 @@
       font-size: 14px;
       color: var(--primary-color);
     }
+    .label-with-button {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .label-with-button label {
+      margin-bottom: 0;
+    }
+    .select-all-btn {
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      background-color: var(--accent-color);
+      color: var(--bg-color);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color .2s;
+    }
+    .select-all-btn:hover {
+      background-color: #2CB87E;
+    }
+    .select-all-btn:disabled {
+      background-color: #50685A;
+      color: var(--text-color);
+      cursor: not-allowed;
+    }
     input[type="text"],
     input[type="password"],
     select,
@@ -198,7 +226,7 @@
     <div class="form-group">
       <label for="branchSelect">Branch:</label>
       <select id="branchSelect" disabled>
-        <option>Enter repo URL &amp; click “Fetch Files”</option>
+        <option>Enter repo URL &amp; click "Fetch Files"</option>
       </select>
     </div>
 
@@ -209,9 +237,12 @@
     <div id="statusMessages"></div>
 
     <div class="form-group">
-      <label>Select Files/Directories:</label>
+      <div class="label-with-button">
+        <label>Select Files/Directories:</label>
+        <button id="selectAllBtn" class="select-all-btn" disabled>Select All</button>
+      </div>
       <div id="fileListContainer">
-        <p>Enter URL and click “Fetch Files.”</p>
+        <p>Enter URL and click "Fetch Files."</p>
       </div>
     </div>
 
@@ -239,6 +270,7 @@
     const patInputGroup     = document.getElementById('patInputGroup');
     const branchSelect      = document.getElementById('branchSelect');
     const fetchFilesBtn     = document.getElementById('fetchFilesBtn');
+    const selectAllBtn      = document.getElementById('selectAllBtn');
     const fileListContainer = document.getElementById('fileListContainer');
     const userInstructions  = document.getElementById('userInstructions');
     const outputMessage     = document.getElementById('outputMessage');
@@ -335,9 +367,50 @@
       loadTree();
     });
 
+    selectAllBtn.addEventListener('click', async () => {
+      const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
+      const allChecked = [...allCheckboxes].every(cb => cb.checked);
+      
+      if (allChecked) {
+        // Uncheck all
+        allCheckboxes.forEach(cb => {
+          cb.checked = false;
+          cb.indeterminate = false;
+        });
+        selectAllBtn.textContent = 'Select All';
+        renderOutput();
+      } else {
+        // Check all and fetch content for files
+        const toFetch = [];
+        allCheckboxes.forEach(cb => {
+          cb.checked = true;
+          cb.indeterminate = false;
+          if (cb.dataset.nodeType === 'file' && !fileCache[cb.value]) {
+            toFetch.push(cb.value);
+          }
+        });
+        
+        if (toFetch.length) {
+          showLoading(`Fetching ${toFetch.length} files…`);
+          await Promise.all(toFetch.map(async p => {
+            try { 
+              fileCache[p] = await fetchContent(p); 
+            } catch {
+              /* ignore */
+            }
+          }));
+          clearStatus();
+        }
+        
+        selectAllBtn.textContent = 'Deselect All';
+        renderOutput();
+      }
+    });
+
     async function loadTree() {
       showLoading(`Fetching tree (${currentRepo.branch})…`);
       fetchFilesBtn.disabled = true;
+      selectAllBtn.disabled = true;
       fileListContainer.innerHTML = '<p>Fetching files…</p>';
       try {
         const r = await fetch(
@@ -355,6 +428,7 @@
         } else {
           const tree = buildTree(data.tree);
           renderTree(tree, fileListContainer);
+          selectAllBtn.disabled = false;
         }
       } catch (e) {
         showError(`Fetch error: ${e.message}`);
@@ -476,7 +550,9 @@
           li.classList.remove('is-loading');
         }
       }
-      renderOutput(); updateParents(cb);
+      renderOutput(); 
+      updateParents(cb);
+      updateSelectAllButton();
     }
 
     async function onDirChange(e){
@@ -494,7 +570,9 @@
         }));
         clearStatus();
       }
-      renderOutput(); updateParents(dirCb);
+      renderOutput(); 
+      updateParents(dirCb);
+      updateSelectAllButton();
     }
 
     function updateParents(cb){
@@ -508,6 +586,12 @@
         else{ pCb.checked=false; pCb.indeterminate=true; }
         ul=pLi.closest('ul');
       }
+    }
+
+    function updateSelectAllButton() {
+      const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
+      const allChecked = [...allCheckboxes].every(cb => cb.checked);
+      selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
     }
 
     async function fetchContent(path){
