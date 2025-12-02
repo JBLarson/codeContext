@@ -60,6 +60,13 @@
       font-size: 14px;
       color: var(--primary-color);
     }
+    .commit-info {
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: normal;
+      color: var(--text-color);
+      font-style: italic;
+    }
     .label-with-button {
       display: flex;
       justify-content: space-between;
@@ -228,6 +235,7 @@
       <select id="branchSelect" disabled>
         <option>Enter repo URL &amp; click "Fetch Files"</option>
       </select>
+      <div id="commitInfo" class="commit-info"></div>
     </div>
 
     <div class="button-group">
@@ -269,6 +277,7 @@
     const githubPatInput    = document.getElementById('githubPat');
     const patInputGroup     = document.getElementById('patInputGroup');
     const branchSelect      = document.getElementById('branchSelect');
+    const commitInfo        = document.getElementById('commitInfo');
     const fetchFilesBtn     = document.getElementById('fetchFilesBtn');
     const selectAllBtn      = document.getElementById('selectAllBtn');
     const fileListContainer = document.getElementById('fileListContainer');
@@ -333,6 +342,26 @@
       return j.default_branch || 'main';
     }
 
+    async function fetchLastCommit(owner, repo, branch) {
+      const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, { headers: getHeaders() });
+      if (!r.ok) throw new Error(r.statusText);
+      const j = await r.json();
+      return j.commit.message.split('\n')[0];
+    }
+
+    async function updateCommitInfo() {
+      if (!currentRepo) {
+        commitInfo.textContent = '';
+        return;
+      }
+      try {
+        const message = await fetchLastCommit(currentRepo.owner, currentRepo.repo, currentRepo.branch);
+        commitInfo.textContent = `Latest commit: ${message}`;
+      } catch {
+        commitInfo.textContent = '';
+      }
+    }
+
     fetchFilesBtn.addEventListener('click', async () => {
       clearStatus();
       const url = repoUrlInput.value.trim();
@@ -352,6 +381,7 @@
         branchSelect.disabled = false;
         currentRepo = { ...info, branch: branchSelect.value };
         fileCache = {};
+        await updateCommitInfo();
         loadTree();
       } catch (e) {
         showError(`Branch error: ${e.message}`);
@@ -360,10 +390,11 @@
       }
     });
 
-    branchSelect.addEventListener('change', () => {
+    branchSelect.addEventListener('change', async () => {
       if (!currentRepo) return;
       currentRepo.branch = branchSelect.value;
       fileCache = {};
+      await updateCommitInfo();
       loadTree();
     });
 
@@ -372,15 +403,12 @@
       const allChecked = [...allCheckboxes].every(cb => cb.checked);
       
       if (allChecked) {
-        // Uncheck all
         allCheckboxes.forEach(cb => {
           cb.checked = false;
           cb.indeterminate = false;
         });
-        selectAllBtn.textContent = 'Select All';
         renderOutput();
       } else {
-        // Check all and fetch content for files
         const toFetch = [];
         allCheckboxes.forEach(cb => {
           cb.checked = true;
@@ -402,9 +430,9 @@
           clearStatus();
         }
         
-        selectAllBtn.textContent = 'Deselect All';
         renderOutput();
       }
+      updateSelectAllButton();
     });
 
     async function loadTree() {
@@ -429,6 +457,7 @@
           const tree = buildTree(data.tree);
           renderTree(tree, fileListContainer);
           selectAllBtn.disabled = false;
+          updateSelectAllButton();
         }
       } catch (e) {
         showError(`Fetch error: ${e.message}`);
@@ -590,8 +619,18 @@
 
     function updateSelectAllButton() {
       const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
+      if (allCheckboxes.length === 0) {
+        selectAllBtn.textContent = 'Select All';
+        return;
+      }
       const allChecked = [...allCheckboxes].every(cb => cb.checked);
-      selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
+      const noneChecked = [...allCheckboxes].every(cb => !cb.checked);
+      
+      if (allChecked) {
+        selectAllBtn.textContent = 'Deselect All';
+      } else {
+        selectAllBtn.textContent = 'Select All';
+      }
     }
 
     async function fetchContent(path){
