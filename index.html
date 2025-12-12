@@ -258,12 +258,14 @@
 
     <div class="form-group">
       <label for="userInstructions">Your Instructions/Prompt:</label>
-      <textarea id="userInstructions" placeholder="Type your prompt…"></textarea>
+      <textarea id="userInstructions" placeholder="Type your prompt…">
+
+RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE</textarea>
     </div>
 
     <div class="form-group">
       <label for="outputMessage">Generated Context:</label>
-      <textarea id="outputMessage" readonly placeholder="Context will appear here…"></textarea>
+      <textarea id="outputMessage"></textarea>
     </div>
 
     <div class="button-group">
@@ -362,6 +364,32 @@
       }
     }
 
+    function updatePromptHeader() {
+      if (!currentRepo) return;
+      const header = `This is code context for the ${currentRepo.owner}/${currentRepo.repo} repository (branch: ${currentRepo.branch}).`;
+      const suffix = "RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE";
+      const headerPrefix = "This is code context for the";
+
+      let currentVal = userInstructions.value;
+      const cleanVal = currentVal.trim();
+
+      // If text is empty or just the suffix, reset format
+      if (cleanVal === suffix || cleanVal === "") {
+        userInstructions.value = `${header}\n\n${suffix}`;
+      } 
+      // If we already have a header, update the first line
+      else if (currentVal.startsWith(headerPrefix)) {
+        const lines = currentVal.split('\n');
+        lines[0] = header;
+        userInstructions.value = lines.join('\n');
+      } 
+      // If user typed something else, prepend the header
+      else {
+        userInstructions.value = `${header}\n\n${currentVal}`;
+      }
+      renderOutput();
+    }
+
     fetchFilesBtn.addEventListener('click', async () => {
       clearStatus();
       const url = repoUrlInput.value.trim();
@@ -381,7 +409,10 @@
         branchSelect.disabled = false;
         currentRepo = { ...info, branch: branchSelect.value };
         fileCache = {};
+        
+        // Update prompts and info
         await updateCommitInfo();
+        updatePromptHeader();
         loadTree();
       } catch (e) {
         showError(`Branch error: ${e.message}`);
@@ -395,6 +426,7 @@
       currentRepo.branch = branchSelect.value;
       fileCache = {};
       await updateCommitInfo();
+      updatePromptHeader();
       loadTree();
     });
 
@@ -624,7 +656,6 @@
         return;
       }
       const allChecked = [...allCheckboxes].every(cb => cb.checked);
-      const noneChecked = [...allCheckboxes].every(cb => !cb.checked);
       
       if (allChecked) {
         selectAllBtn.textContent = 'Deselect All';
