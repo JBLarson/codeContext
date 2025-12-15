@@ -1,0 +1,287 @@
+:root {
+  /* Dark Green Theme */
+  --bg-color: #0B1D12;
+  --card-bg: #112B1A;
+  --primary-color: #E6F0EA;
+  --accent-color: #34D399;
+  --text-color: #A0B0A8;
+  --input-border: #2A5238;
+  --input-bg-color: #08140A;
+  --error-bg: #4d1f1f;
+  --error-text: #ffacac;
+  --loading-bg: #1A3824;
+  --warning-bg: #4a3b00;
+
+  --border-radius: 8px;
+  --spacing: 16px;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  font-family: var(--font-family);
+  color: var(--text-color);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 40px 0;
+}
+
+.container {
+  width: 90%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--spacing);
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  border: 1px solid var(--input-border);
+}
+
+h1 {
+  margin: 0 0 calc(var(--spacing)*1.5);
+  font-size: 24px;
+  text-align: center;
+  color: var(--primary-color);
+}
+
+.form-group {
+  margin-bottom: var(--spacing);
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--primary-color);
+}
+
+.commit-info {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--text-color);
+  font-style: italic;
+}
+
+.label-with-button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.label-with-button label {
+  margin-bottom: 0;
+}
+
+.select-all-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  background-color: var(--accent-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color .2s;
+}
+
+.select-all-btn:hover {
+  background-color: #2CB87E;
+}
+
+.select-all-btn:disabled {
+  background-color: #50685A;
+  color: var(--text-color);
+  cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+  width: calc(100% - 22px);
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius);
+  background-color: var(--input-bg-color);
+  color: var(--primary-color);
+  font-family: inherit;
+  transition: border-color .2s, background-color .2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-color);
+  background-color: #0E1E14;
+}
+
+textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+#outputMessage {
+  min-height: 250px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.button-group {
+  display: flex;
+  gap: var(--spacing);
+  margin: var(--spacing) 0;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  background-color: var(--accent-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background-color .2s;
+}
+
+button:hover {
+  background-color: #2CB87E;
+}
+
+button:disabled {
+  background-color: #50685A;
+  color: var(--text-color);
+  cursor: not-allowed;
+}
+
+#fileListContainer {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: var(--spacing);
+  background-color: var(--input-bg-color);
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius);
+}
+
+#fileListContainer ul {
+  list-style: none;
+  padding-left: 20px;
+  margin: 0;
+}
+
+#fileListContainer ul.file-tree-root {
+  padding-left: 0;
+}
+
+.file-tree-node {
+  margin: 4px 0;
+}
+
+.node-content {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color .2s;
+}
+
+.file-tree-node:hover > .node-content {
+  background-color: #1A3824;
+}
+
+.node-content input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+  position: relative;
+  top: 1px;
+}
+
+.node-content label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--text-color);
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.node-content label.dir-label {
+  font-weight: 500;
+  color: var(--primary-color);
+}
+
+.dir-toggle {
+  width: 1em;
+  margin-right: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .1s;
+  color: var(--accent-color);
+}
+
+.dir-toggle.open {
+  transform: rotate(90deg);
+}
+
+.file-tree-node.node-type-file .dir-toggle {
+  display: none;
+}
+
+.loading-indicator {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 12px;
+  color: var(--accent-color);
+  display: none;
+}
+
+.file-tree-node.is-loading > .node-content .loading-indicator {
+  display: inline !important;
+}
+
+.message-area {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  text-align: center;
+}
+
+.loading-message {
+  background: var(--loading-bg);
+  color: var(--accent-color);
+}
+
+.error-message {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.warning-message {
+  background: var(--warning-bg);
+  color: var(--primary-color);
+  text-align: left;
+  font-size: 12px;
+}
+
+#authErrorContainer {
+  margin-bottom: var(--spacing);
+}
+
+#authErrorContainer .message-area {
+  margin-top: 0;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--input-border);
+  margin: calc(var(--spacing)*1.5) 0;
+}
