@@ -49,19 +49,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     return h;
   }
 
-  async function isPrivateRepoError(response) {
-    if (response.status === 404) {
-      return !!token;
-    }
+  function shouldShowAuthError(response) {
+    // Only show auth errors if we have a token AND got auth-related errors
+    // This prevents false positives for public repos
+    if (!token) return false;
     return response.status === 401 || response.status === 403;
   }
 
-  async function handleAuthError(response, isPrivate = false) {
+  async function handleAuthError(response) {
     let errorMsg = 'Your GitHub token is invalid or has insufficient permissions.';
     
-    if (response.status === 404 && isPrivate) {
-      errorMsg = 'Repository not found or is private. Your token may not have access to this private repository.';
-    } else if (response.status === 401) {
+    if (response.status === 401) {
       errorMsg = 'GitHub authentication failed. Your token may be invalid or expired.';
     } else if (response.status === 403) {
       try {
@@ -69,12 +67,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (body.message && body.message.includes('API rate limit')) {
           errorMsg = 'GitHub API rate limit exceeded. Wait an hour or use a valid token.';
         } else if (body.message && body.message.includes('Resource not accessible')) {
-          errorMsg = 'Token does not have access to this private repository. Check token permissions and organization settings.';
+          errorMsg = 'Token does not have access to this repository. Check token permissions and organization settings.';
         } else {
-          errorMsg = 'GitHub access forbidden. Your token may lack necessary permissions or organization approval for this private repository.';
+          errorMsg = 'GitHub access forbidden. Your token may lack necessary permissions or organization approval.';
         }
       } catch {
-        errorMsg = 'GitHub access forbidden. Your token may lack necessary permissions for this private repository.';
+        errorMsg = 'GitHub access forbidden. Your token may lack necessary permissions.';
       }
     }
     
@@ -98,7 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function fetchBranches(owner, repo) {
     const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, { headers: getHeaders() });
     if (!r.ok) {
-      if (isPrivateRepoError(r)) await handleAuthError(r, true);
+      if (shouldShowAuthError(r)) await handleAuthError(r);
       throw new Error(r.statusText);
     }
     return (await r.json()).map(b=>b.name);
@@ -107,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function fetchDefaultBranch(owner,repo) {
     const r = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: getHeaders() });
     if (!r.ok) {
-      if (isPrivateRepoError(r)) await handleAuthError(r, true);
+      if (shouldShowAuthError(r)) await handleAuthError(r);
       throw new Error(r.statusText);
     }
     const j = await r.json();
@@ -117,7 +115,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function fetchLastCommit(owner, repo, branch) {
     const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, { headers: getHeaders() });
     if (!r.ok) {
-      if (isPrivateRepoError(r)) await handleAuthError(r, true);
+      if (shouldShowAuthError(r)) await handleAuthError(r);
       throw new Error(r.statusText);
     }
     const j = await r.json();
@@ -248,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { headers:getHeaders() }
       );
       if (!r.ok) {
-        if (isPrivateRepoError(r)) await handleAuthError(r, true);
+        if (shouldShowAuthError(r)) await handleAuthError(r);
         throw new Error(r.statusText);
       }
       const data = await r.json();
@@ -443,7 +441,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       { headers:getHeaders() }
     );
     if(!r.ok) {
-      if (isPrivateRepoError(r)) await handleAuthError(r, true);
+      if (shouldShowAuthError(r)) await handleAuthError(r);
       throw new Error(r.statusText);
     }
     const j = await r.json();
