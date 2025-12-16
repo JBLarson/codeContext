@@ -1,0 +1,1 @@
+const GITHUB_TOKEN = 'YOUR_TOKEN';
