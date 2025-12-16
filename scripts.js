@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize token from config.js if available
   let token = null;
 
-  // Check if GITHUB_TOKEN is defined in config.js and has a value
+  // Check if GITHUB_TOKEN is defined in token.js and has a value
   if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN.trim().length > 0) {
     token = GITHUB_TOKEN.trim();
     // Hide the input field if we have a valid token from config
