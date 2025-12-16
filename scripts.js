@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const repoUrlInput      = document.getElementById('repoUrl');
   const githubPatInput    = document.getElementById('githubPat');
+  const patContainer      = document.getElementById('patContainer');
   const branchSelect      = document.getElementById('branchSelect');
   const commitInfo        = document.getElementById('commitInfo');
   const fetchFilesBtn     = document.getElementById('fetchFilesBtn');
@@ -15,9 +16,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentRepo = null;
   let fileCache = {};
-  let token = typeof GITHUB_TOKEN !== 'undefined' ? GITHUB_TOKEN : null;
+  
+  // Initialize token from config.js if available
+  let token = null;
+
+  // Check if GITHUB_TOKEN is defined in config.js and has a value
+  if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN.trim().length > 0) {
+    token = GITHUB_TOKEN.trim();
+    // Hide the input field if we have a valid token from config
+    if (patContainer) {
+      patContainer.style.display = 'none';
+    }
+  }
 
   githubPatInput.addEventListener('input', () => {
+    // Only update token from input if config token wasn't used/valid
     token = githubPatInput.value.trim() || null;
     clearAuthError();
   });

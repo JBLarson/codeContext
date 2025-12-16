@@ -25,12 +25,9 @@
       </div>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" id="patContainer">
       <label for="githubPat">GitHub Personal Access Token (optional for public repos):</label>
       <input type="password" id="githubPat" placeholder="Enter GitHub PAT for private repos…" />
-      <div class="warning-message" style="margin-top:5px">
-        <strong>Security Note:</strong> For better security, set GITHUB_TOKEN in server/.env file and run the local server.
-      </div>
     </div>
 
     <div class="form-group">
@@ -41,7 +38,7 @@
     <div class="form-group">
       <label for="branchSelect">Branch:</label>
       <select id="branchSelect" disabled>
-        <option>Enter repo URL &amp; click "Fetch Files"</option>
+        <option>Enter repo URL & click "Fetch Files"</option>
       </select>
       <div id="commitInfo" class="commit-info"></div>
     </div>
@@ -81,8 +78,8 @@ RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE</textarea>
     </div>
   </div>
 
-  <script src="scripts.js"></script>
   <script src="config.js"></script>
+  <script src="scripts.js"></script>
 
 </body>
 </html>
