@@ -285,3 +285,34 @@ hr {
   border-top: 1px solid var(--input-border);
   margin: calc(var(--spacing)*1.5) 0;
 }
+
+
+.multi-message-block {
+  margin: 20px 0;
+  padding: var(--spacing);
+  background-color: var(--input-bg-color);
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius);
+}
+
+.multi-message-header {
+  margin-bottom: 10px;
+  color: var(--primary-color);
+  font-size: 16px;
+}
+
+.multi-message-textarea {
+  width: calc(100% - 22px);
+  min-height: 200px;
+  margin-bottom: 10px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+#multiModeConfig {
+  padding: var(--spacing);
+  background-color: var(--input-bg-color);
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--spacing);
+}

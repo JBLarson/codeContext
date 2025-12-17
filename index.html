@@ -68,6 +68,54 @@
 RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE</textarea>
     </div>
 
+    <hr/>
+
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="multiModeToggle" style="display: inline; width: auto; margin-right: 8px;">
+        Multi-Message Mode (for large codebases)
+      </label>
+    </div>
+
+    <div id="multiModeConfig" style="display: none;">
+      <div class="form-group">
+        <label for="holdingResponse">Holding Response Text:</label>
+        <input type="text" id="holdingResponse" value="We are building a decentralized collective intelligence" />
+      </div>
+      
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="advancedPathsToggle" style="display: inline; width: auto; margin-right: 8px;">
+          Advanced Path Configuration
+        </label>
+      </div>
+      
+      <div id="advancedPathsConfig" style="display: none; padding-left: 20px;">
+        <div class="form-group">
+          <label for="backendPath">Backend Directory Path:</label>
+          <input type="text" id="backendPath" value="backend" />
+        </div>
+        
+        <div class="form-group">
+          <label for="frontendPath">Frontend Root Path:</label>
+          <input type="text" id="frontendPath" value="frontend" />
+        </div>
+        
+        <div class="form-group">
+          <label for="componentsPath">Components Path (to exclude in message 2):</label>
+          <input type="text" id="componentsPath" value="frontend/src/components" />
+        </div>
+      </div>
+      
+      <div class="button-group">
+        <button id="generateMultiBtn">Generate 3 Messages</button>
+      </div>
+      
+      <div id="multiMessagesOutput"></div>
+    </div>
+
+    <hr/>
+
     <div class="form-group">
       <label for="outputMessage">Generated Context:</label>
       <textarea id="outputMessage"></textarea>

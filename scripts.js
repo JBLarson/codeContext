@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
+  // ============================================================================
+  // DOM ELEMENTS
+  // ============================================================================
   const repoUrlInput      = document.getElementById('repoUrl');
   const githubPatInput    = document.getElementById('githubPat');
   const patContainer      = document.getElementById('patContainer');
@@ -14,27 +17,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const authErrorContainer = document.getElementById('authErrorContainer');
   const authErrorMessage   = document.getElementById('authErrorMessage');
 
+  // ============================================================================
+  // STATE
+  // ============================================================================
   let currentRepo = null;
   let fileCache = {};
-  
-  // Initialize token from config.js if available
   let token = null;
 
   // Check if GITHUB_TOKEN is defined in token.js and has a value
   if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN.trim().length > 0) {
     token = GITHUB_TOKEN.trim();
-    // Hide the input field if we have a valid token from config
     if (patContainer) {
       patContainer.style.display = 'none';
     }
   }
 
-  githubPatInput.addEventListener('input', () => {
-    // Only update token from input if config token wasn't used/valid
-    token = githubPatInput.value.trim() || null;
-    clearAuthError();
-  });
-
+  // ============================================================================
+  // UI HELPER FUNCTIONS
+  // ============================================================================
   function showLoading(msg) {
     statusMessages.innerHTML = `<div class="message-area loading-message">${msg}</div>`;
   }
@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     authErrorContainer.style.display = 'none';
   }
 
+  // ============================================================================
+  // GITHUB API FUNCTIONS
+  // ============================================================================
   function getHeaders() {
     const h = { 'Accept': 'application/vnd.github.v3+json' };
     if (token) h['Authorization'] = `Bearer ${token}`;
@@ -63,8 +66,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function shouldShowAuthError(response) {
-    // Only show auth errors if we have a token AND got auth-related errors
-    // This prevents false positives for public repos
     if (!token) return false;
     return response.status === 401 || response.status === 403;
   }
@@ -91,8 +92,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     showAuthError(errorMsg);
   }
-
-  userInstructions.addEventListener('input', renderOutput);
 
   function parseUrl(url) {
     try {
@@ -135,156 +134,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     return j.commit.message.split('\n')[0];
   }
 
-  async function updateCommitInfo() {
-    if (!currentRepo) {
-      commitInfo.textContent = '';
-      return;
+  async function fetchContent(path){
+    const r = await fetch(
+      `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${currentRepo.branch}`,
+      { headers:getHeaders() }
+    );
+    if(!r.ok) {
+      if (shouldShowAuthError(r)) await handleAuthError(r);
+      throw new Error(r.statusText);
     }
-    try {
-      const message = await fetchLastCommit(currentRepo.owner, currentRepo.repo, currentRepo.branch);
-      commitInfo.textContent = `Latest commit: ${message}`;
-    } catch {
-      commitInfo.textContent = '';
-    }
+    const j = await r.json();
+    if(j.encoding!=='base64') throw new Error('Bad encoding');
+    return atob(j.content);
   }
 
-  function updatePromptHeader() {
-    if (!currentRepo) return;
-    const header = `This is code context for the ${currentRepo.owner}/${currentRepo.repo} repository (branch: ${currentRepo.branch}).`;
-    const suffix = "RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE";
-    const headerPrefix = "This is code context for the";
-
-    let currentVal = userInstructions.value;
-    const cleanVal = currentVal.trim();
-
-    if (cleanVal === suffix || cleanVal === "") {
-      userInstructions.value = `${header}\n\n${suffix}`;
-    } 
-    else if (currentVal.startsWith(headerPrefix)) {
-      const lines = currentVal.split('\n');
-      lines[0] = header;
-      userInstructions.value = lines.join('\n');
-    } 
-    else {
-      userInstructions.value = `${header}\n\n${currentVal}`;
-    }
-    renderOutput();
-  }
-
-  fetchFilesBtn.addEventListener('click', async () => {
-    clearStatus();
-    clearAuthError();
-    const url = repoUrlInput.value.trim();
-    const info = parseUrl(url);
-    if (!info) { showError('Invalid GitHub URL.'); return; }
-
-    showLoading('Loading branches…');
-    branchSelect.disabled = true;
-    try {
-      const [branches, def] = await Promise.all([
-        fetchBranches(info.owner, info.repo),
-        fetchDefaultBranch(info.owner, info.repo)
-      ]);
-      branchSelect.innerHTML = branches
-        .map(b=>`<option value="${b}"${b===def?' selected':''}>${b}</option>`)
-        .join('');
-      branchSelect.disabled = false;
-      currentRepo = { ...info, branch: branchSelect.value };
-      fileCache = {};
-      
-      await updateCommitInfo();
-      updatePromptHeader();
-      loadTree();
-    } catch (e) {
-      showError(`Branch error: ${e.message}`);
-    } finally {
-      clearStatus();
-    }
-  });
-
-  branchSelect.addEventListener('change', async () => {
-    if (!currentRepo) return;
-    currentRepo.branch = branchSelect.value;
-    fileCache = {};
-    await updateCommitInfo();
-    updatePromptHeader();
-    loadTree();
-  });
-
-  selectAllBtn.addEventListener('click', async () => {
-    const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
-    const allChecked = [...allCheckboxes].every(cb => cb.checked);
-    
-    if (allChecked) {
-      allCheckboxes.forEach(cb => {
-        cb.checked = false;
-        cb.indeterminate = false;
-      });
-      renderOutput();
-    } else {
-      const toFetch = [];
-      allCheckboxes.forEach(cb => {
-        cb.checked = true;
-        cb.indeterminate = false;
-        if (cb.dataset.nodeType === 'file' && !fileCache[cb.value]) {
-          toFetch.push(cb.value);
-        }
-      });
-      
-      if (toFetch.length) {
-        showLoading(`Fetching ${toFetch.length} files…`);
-        await Promise.all(toFetch.map(async p => {
-          try { 
-            fileCache[p] = await fetchContent(p); 
-          } catch {
-            /* ignore */
-          }
-        }));
-        clearStatus();
-      }
-      
-      renderOutput();
-    }
-    updateSelectAllButton();
-  });
-
-  async function loadTree() {
-    showLoading(`Fetching tree (${currentRepo.branch})…`);
-    fetchFilesBtn.disabled = true;
-    selectAllBtn.disabled = true;
-    fileListContainer.innerHTML = '<p>Fetching files…</p>';
-    try {
-      const r = await fetch(
-        `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/git/trees/${currentRepo.branch}?recursive=1`,
-        { headers:getHeaders() }
-      );
-      if (!r.ok) {
-        if (shouldShowAuthError(r)) await handleAuthError(r);
-        throw new Error(r.statusText);
-      }
-      const data = await r.json();
-      fileListContainer.innerHTML = '';
-      if (data.truncated) {
-        fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated.</div>`;
-      }
-      if (!data.tree || !data.tree.length) {
-        fileListContainer.innerHTML += '<p>No files found.</p>';
-      } else {
-        const tree = buildTree(data.tree);
-        renderTree(tree, fileListContainer);
-        selectAllBtn.disabled = false;
-        updateSelectAllButton();
-      }
-    } catch (e) {
-      showError(`Fetch error: ${e.message}`);
-      fileListContainer.innerHTML = '<p>Could not fetch files.</p>';
-    } finally {
-      clearStatus();
-      fetchFilesBtn.disabled = false;
-      renderOutput();
-    }
-  }
-
+  // ============================================================================
+  // TREE BUILDING & RENDERING
+  // ============================================================================
   function buildTree(items) {
     const root = { children: {} };
     items.filter(i=>i.type==='blob'||i.type==='tree')
@@ -383,6 +249,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     return li;
   }
 
+  // ============================================================================
+  // FILE/DIRECTORY CHANGE HANDLERS
+  // ============================================================================
   async function onFileChange(e){
     const cb=e.target, path=cb.value, li=cb.closest('.file-tree-node');
     if(cb.checked && !fileCache[path]){
@@ -448,20 +317,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  async function fetchContent(path){
-    const r = await fetch(
-      `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${currentRepo.branch}`,
-      { headers:getHeaders() }
-    );
-    if(!r.ok) {
-      if (shouldShowAuthError(r)) await handleAuthError(r);
-      throw new Error(r.statusText);
-    }
-    const j = await r.json();
-    if(j.encoding!=='base64') throw new Error('Bad encoding');
-    return atob(j.content);
-  }
-
+  // ============================================================================
+  // OUTPUT RENDERING
+  // ============================================================================
   function renderOutput(){
     let out = userInstructions.value || '';
     fileListContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb=>{
@@ -472,10 +330,371 @@ document.addEventListener('DOMContentLoaded', async () => {
     outputMessage.value = out;
   }
 
+  function updatePromptHeader() {
+    if (!currentRepo) return;
+    const header = `This is code context for the ${currentRepo.owner}/${currentRepo.repo} repository (branch: ${currentRepo.branch}).`;
+    const suffix = "RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE";
+    const headerPrefix = "This is code context for the";
+
+    let currentVal = userInstructions.value;
+    const cleanVal = currentVal.trim();
+
+    if (cleanVal === suffix || cleanVal === "") {
+      userInstructions.value = `${header}\n\n${suffix}`;
+    } 
+    else if (currentVal.startsWith(headerPrefix)) {
+      const lines = currentVal.split('\n');
+      lines[0] = header;
+      userInstructions.value = lines.join('\n');
+    } 
+    else {
+      userInstructions.value = `${header}\n\n${currentVal}`;
+    }
+    renderOutput();
+  }
+
+  async function updateCommitInfo() {
+    if (!currentRepo) {
+      commitInfo.textContent = '';
+      return;
+    }
+    try {
+      const message = await fetchLastCommit(currentRepo.owner, currentRepo.repo, currentRepo.branch);
+      commitInfo.textContent = `Latest commit: ${message}`;
+    } catch {
+      commitInfo.textContent = '';
+    }
+  }
+
+  async function loadTree() {
+    showLoading(`Fetching tree (${currentRepo.branch})…`);
+    fetchFilesBtn.disabled = true;
+    selectAllBtn.disabled = true;
+    fileListContainer.innerHTML = '<p>Fetching files…</p>';
+    try {
+      const r = await fetch(
+        `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/git/trees/${currentRepo.branch}?recursive=1`,
+        { headers:getHeaders() }
+      );
+      if (!r.ok) {
+        if (shouldShowAuthError(r)) await handleAuthError(r);
+        throw new Error(r.statusText);
+      }
+      const data = await r.json();
+      fileListContainer.innerHTML = '';
+      if (data.truncated) {
+        fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated.</div>`;
+      }
+      if (!data.tree || !data.tree.length) {
+        fileListContainer.innerHTML += '<p>No files found.</p>';
+      } else {
+        const tree = buildTree(data.tree);
+        renderTree(tree, fileListContainer);
+        selectAllBtn.disabled = false;
+        updateSelectAllButton();
+      }
+    } catch (e) {
+      showError(`Fetch error: ${e.message}`);
+      fileListContainer.innerHTML = '<p>Could not fetch files.</p>';
+    } finally {
+      clearStatus();
+      fetchFilesBtn.disabled = false;
+      renderOutput();
+    }
+  }
+
+  // ============================================================================
+  // MAIN EVENT LISTENERS
+  // ============================================================================
+  githubPatInput.addEventListener('input', () => {
+    token = githubPatInput.value.trim() || null;
+    clearAuthError();
+  });
+
+  userInstructions.addEventListener('input', renderOutput);
+
+  fetchFilesBtn.addEventListener('click', async () => {
+    clearStatus();
+    clearAuthError();
+    const url = repoUrlInput.value.trim();
+    const info = parseUrl(url);
+    if (!info) { showError('Invalid GitHub URL.'); return; }
+
+    showLoading('Loading branches…');
+    branchSelect.disabled = true;
+    try {
+      const [branches, def] = await Promise.all([
+        fetchBranches(info.owner, info.repo),
+        fetchDefaultBranch(info.owner, info.repo)
+      ]);
+      branchSelect.innerHTML = branches
+        .map(b=>`<option value="${b}"${b===def?' selected':''}>${b}</option>`)
+        .join('');
+      branchSelect.disabled = false;
+      currentRepo = { ...info, branch: branchSelect.value };
+      fileCache = {};
+      
+      await updateCommitInfo();
+      updatePromptHeader();
+      loadTree();
+    } catch (e) {
+      showError(`Branch error: ${e.message}`);
+    } finally {
+      clearStatus();
+    }
+  });
+
+  branchSelect.addEventListener('change', async () => {
+    if (!currentRepo) return;
+    currentRepo.branch = branchSelect.value;
+    fileCache = {};
+    await updateCommitInfo();
+    updatePromptHeader();
+    loadTree();
+  });
+
+  selectAllBtn.addEventListener('click', async () => {
+    const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
+    const allChecked = [...allCheckboxes].every(cb => cb.checked);
+    
+    if (allChecked) {
+      allCheckboxes.forEach(cb => {
+        cb.checked = false;
+        cb.indeterminate = false;
+      });
+      renderOutput();
+    } else {
+      const toFetch = [];
+      allCheckboxes.forEach(cb => {
+        cb.checked = true;
+        cb.indeterminate = false;
+        if (cb.dataset.nodeType === 'file' && !fileCache[cb.value]) {
+          toFetch.push(cb.value);
+        }
+      });
+      
+      if (toFetch.length) {
+        showLoading(`Fetching ${toFetch.length} files…`);
+        await Promise.all(toFetch.map(async p => {
+          try { 
+            fileCache[p] = await fetchContent(p); 
+          } catch {
+            /* ignore */
+          }
+        }));
+        clearStatus();
+      }
+      
+      renderOutput();
+    }
+    updateSelectAllButton();
+  });
+
   copyBtn.addEventListener('click', ()=>{
     if(!outputMessage.value){ showError('Nothing to copy.'); setTimeout(clearStatus,2000); return; }
     navigator.clipboard.writeText(outputMessage.value)
       .then(_=>{ copyBtn.textContent='Copied!'; setTimeout(_=>copyBtn.textContent='Copy to Clipboard',1500); })
       .catch(_=>{ showError('Copy failed.'); });
   });
+
+  // ============================================================================
+  // MULTI-MESSAGE MODE
+  // ============================================================================
+  let multiMessageConfig = {
+    backendPath: 'backend',
+    frontendPath: 'frontend',
+    componentsPath: 'frontend/src/components',
+    holdingResponse: 'We are building a decentralized collective intelligence'
+  };
+
+  const multiModeToggle = document.getElementById('multiModeToggle');
+  const multiModeConfig = document.getElementById('multiModeConfig');
+  const generateMultiBtn = document.getElementById('generateMultiBtn');
+  const advancedPathsToggle = document.getElementById('advancedPathsToggle');
+  const advancedPathsConfig = document.getElementById('advancedPathsConfig');
+
+  if (multiModeToggle) {
+    multiModeToggle.addEventListener('change', (e) => {
+      if (multiModeConfig) {
+        multiModeConfig.style.display = e.target.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  if (advancedPathsToggle) {
+    advancedPathsToggle.addEventListener('change', (e) => {
+      if (advancedPathsConfig) {
+        advancedPathsConfig.style.display = e.target.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  if (generateMultiBtn) {
+    generateMultiBtn.addEventListener('click', async () => {
+      if (!currentRepo) {
+        showError('Please fetch files first.');
+        setTimeout(clearStatus, 2000);
+        return;
+      }
+
+      // Update config from inputs
+      const backendPathInput = document.getElementById('backendPath');
+      const frontendPathInput = document.getElementById('frontendPath');
+      const componentsPathInput = document.getElementById('componentsPath');
+      const holdingResponseInput = document.getElementById('holdingResponse');
+
+      if (backendPathInput) multiMessageConfig.backendPath = backendPathInput.value.trim();
+      if (frontendPathInput) multiMessageConfig.frontendPath = frontendPathInput.value.trim();
+      if (componentsPathInput) multiMessageConfig.componentsPath = componentsPathInput.value.trim();
+      if (holdingResponseInput) multiMessageConfig.holdingResponse = holdingResponseInput.value.trim();
+
+      // Auto-select and fetch all required directories
+      showLoading('Fetching all required files for multi-message mode...');
+      
+      const allCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'));
+      const toFetch = [];
+      
+      // Select all backend files
+      allCheckboxes.forEach(cb => {
+        if (cb.value.startsWith(multiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file') {
+          cb.checked = true;
+          if (!fileCache[cb.value]) toFetch.push(cb.value);
+        }
+      });
+      
+      // Select all frontend files
+      allCheckboxes.forEach(cb => {
+        if (cb.value.startsWith(multiMessageConfig.frontendPath + '/') && cb.dataset.nodeType === 'file') {
+          cb.checked = true;
+          if (!fileCache[cb.value]) toFetch.push(cb.value);
+        }
+      });
+      
+      // Fetch all files
+      if (toFetch.length) {
+        await Promise.all(toFetch.map(async p => {
+          try { 
+            fileCache[p] = await fetchContent(p); 
+          } catch {
+            /* ignore */
+          }
+        }));
+      }
+      
+      clearStatus();
+
+      const messages = [
+        generateMessage1(),
+        generateMessage2(),
+        generateMessage3()
+      ];
+
+      displayMultiMessages(messages);
+    });
+  }
+
+  function generateMessage1() {
+    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the backend for ${repoName}.\n\nDo not write any code yet. Simply respond "${multiMessageConfig.holdingResponse}"`;
+    
+    let content = header;
+    
+    const backendCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => cb.value.startsWith(multiMessageConfig.backendPath + '/') && 
+                    cb.dataset.nodeType === 'file' && 
+                    cb.checked);
+    
+    backendCheckboxes.forEach(cb => {
+      if (fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      }
+    });
+    
+    return content;
+  }
+
+  function generateMessage2() {
+    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the frontend without the components dir.\n\nDo not write any code yet. Simply respond "${multiMessageConfig.holdingResponse}"`;
+    
+    let content = header;
+    
+    const frontendCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => cb.value.startsWith(multiMessageConfig.frontendPath + '/') && 
+                    !cb.value.startsWith(multiMessageConfig.componentsPath + '/') &&
+                    cb.dataset.nodeType === 'file' && 
+                    cb.checked);
+    
+    frontendCheckboxes.forEach(cb => {
+      if (fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      }
+    });
+    
+    return content;
+  }
+
+  function generateMessage3() {
+    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the frontend components directory.`;
+    
+    let content = header;
+    
+    const componentCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => cb.value.startsWith(multiMessageConfig.componentsPath + '/') && 
+                    cb.dataset.nodeType === 'file' && 
+                    cb.checked);
+    
+    componentCheckboxes.forEach(cb => {
+      if (fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      }
+    });
+    
+    const instructions = userInstructions.value.trim();
+    const lines = instructions.split('\n');
+    const userContent = lines.filter(line => !line.startsWith('This is code context')).join('\n').trim();
+    
+    if (userContent && userContent !== 'RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE') {
+      content += `\n\n${userContent}`;
+    }
+    
+    return content;
+  }
+
+  function displayMultiMessages(messages) {
+    const container = document.getElementById('multiMessagesOutput');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    messages.forEach((msg, idx) => {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'multi-message-block';
+      
+      const header = document.createElement('div');
+      header.className = 'multi-message-header';
+      header.innerHTML = `<strong>Message ${idx + 1}</strong>`;
+      
+      const textarea = document.createElement('textarea');
+      textarea.className = 'multi-message-textarea';
+      textarea.value = msg;
+      textarea.readOnly = true;
+      
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = 'Copy Message ' + (idx + 1);
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(msg).then(() => {
+          const original = copyBtn.textContent;
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => copyBtn.textContent = original, 1500);
+        });
+      };
+      
+      msgDiv.appendChild(header);
+      msgDiv.appendChild(textarea);
+      msgDiv.appendChild(copyBtn);
+      container.appendChild(msgDiv);
+    });
+  }
 });
