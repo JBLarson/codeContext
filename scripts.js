@@ -498,12 +498,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ============================================================================
-  // MULTI-MESSAGE MODE
+  // MULTI-MESSAGE MODE (HARD-CODED FOR NEUROFOLD)
   // ============================================================================
   let multiMessageConfig = {
     backendPath: 'backend',
     frontendPath: 'frontend',
     componentsPath: 'frontend/src/components',
+    graphSubdirs: [
+      'frontend/src/components/graph',
+      'frontend/src/components/graph2d',
+      'frontend/src/components/graph_semantic',
+      'frontend/src/components/graph_geometric'
+    ],
     holdingResponse: 'We are building a decentralized collective intelligence'
   };
 
@@ -530,6 +536,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (generateMultiBtn) {
+    generateMultiBtn.textContent = 'Generate 4 Messages';
+    
     generateMultiBtn.addEventListener('click', async () => {
       if (!currentRepo) {
         showError('Please fetch files first.');
@@ -548,7 +556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (componentsPathInput) multiMessageConfig.componentsPath = componentsPathInput.value.trim();
       if (holdingResponseInput) multiMessageConfig.holdingResponse = holdingResponseInput.value.trim();
 
-      // Auto-select and fetch all required directories
+      // Auto-select and fetch all required files
       showLoading('Fetching all required files for multi-message mode...');
       
       const allCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'));
@@ -586,7 +594,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const messages = [
         generateMessage1(),
         generateMessage2(),
-        generateMessage3()
+        generateMessage3(),
+        generateMessage4()
       ];
 
       displayMultiMessages(messages);
@@ -595,7 +604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function generateMessage1() {
     const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the backend for ${repoName}.\n\nDo not write any code yet. Simply respond "${multiMessageConfig.holdingResponse}"`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the backend for ${repoName}.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${multiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
     
     let content = header;
     
@@ -615,7 +624,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function generateMessage2() {
     const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the frontend without the components dir.\n\nDo not write any code yet. Simply respond "${multiMessageConfig.holdingResponse}"`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the frontend without the components dir.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${multiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
     
     let content = header;
     
@@ -636,14 +645,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function generateMessage3() {
     const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the frontend components directory.`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere are the graph visualization components (graph, graph2d, graph_semantic, graph_geometric).\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${multiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
+    
+
+
+    let content = header;
+    
+    const graphCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => {
+        return multiMessageConfig.graphSubdirs.some(subdir => 
+          cb.value.startsWith(subdir + '/') && cb.dataset.nodeType === 'file' && cb.checked
+        );
+      });
+    
+    graphCheckboxes.forEach(cb => {
+      if (fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      }
+    });
+    
+    return content;
+  }
+
+  function generateMessage4() {
+    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the rest of the frontend components directory (excluding graph subdirectories).`;
     
     let content = header;
     
     const componentCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => cb.value.startsWith(multiMessageConfig.componentsPath + '/') && 
-                    cb.dataset.nodeType === 'file' && 
-                    cb.checked);
+      .filter(cb => {
+        if (!cb.value.startsWith(multiMessageConfig.componentsPath + '/') || 
+            cb.dataset.nodeType !== 'file' || 
+            !cb.checked) {
+          return false;
+        }
+        
+        // Exclude the 4 graph subdirectories
+        return !multiMessageConfig.graphSubdirs.some(subdir => cb.value.startsWith(subdir + '/'));
+      });
     
     componentCheckboxes.forEach(cb => {
       if (fileCache[cb.value]) {
