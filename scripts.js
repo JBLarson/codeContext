@@ -1,713 +1,104 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  // ============================================================================
-  // DOM ELEMENTS
-  // ============================================================================
-  const repoUrlInput      = document.getElementById('repoUrl');
-  const githubPatInput    = document.getElementById('githubPat');
-  const patContainer      = document.getElementById('patContainer');
-  const branchSelect      = document.getElementById('branchSelect');
-  const commitInfo        = document.getElementById('commitInfo');
-  const fetchFilesBtn     = document.getElementById('fetchFilesBtn');
-  const selectAllBtn      = document.getElementById('selectAllBtn');
-  const fileListContainer = document.getElementById('fileListContainer');
-  const userInstructions  = document.getElementById('userInstructions');
-  const outputMessage     = document.getElementById('outputMessage');
-  const copyBtn           = document.getElementById('copyBtn');
-  const statusMessages    = document.getElementById('statusMessages');
-  const authErrorContainer = document.getElementById('authErrorContainer');
-  const authErrorMessage   = document.getElementById('authErrorMessage');
+// scripts.js
+const MultiMessageConfig = {
+  backendPath: 'backend',
+  frontendPath: 'frontend',
+  componentsPath: 'frontend/src/components',
+  graphSubdirs: [
+    'frontend/src/components/graph',
+    'frontend/src/components/graph2d',
+    'frontend/src/components/graph_semantic',
+    'frontend/src/components/graph_geometric',
+    'frontend/src/components/graph_universe'
+  ],
+  holdingResponse: 'We are building a decentralized collective intelligence'
+};
 
-  // ============================================================================
-  // STATE
-  // ============================================================================
-  let currentRepo = null;
-  let fileCache = {};
-  let token = null;
-
-  // Check if GITHUB_TOKEN is defined in token.js and has a value
-  if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN.trim().length > 0) {
-    token = GITHUB_TOKEN.trim();
-    if (patContainer) {
-      patContainer.style.display = 'none';
-    }
-  }
-
-  // ============================================================================
-  // UI HELPER FUNCTIONS
-  // ============================================================================
-  function showLoading(msg) {
-    statusMessages.innerHTML = `<div class="message-area loading-message">${msg}</div>`;
-  }
-
-  function showError(msg) {
-    statusMessages.innerHTML = `<div class="message-area error-message">${msg}</div>`;
-  }
-
-  function clearStatus() {
-    statusMessages.innerHTML = '';
-  }
-
-  function showAuthError(msg) {
-    authErrorMessage.textContent = msg;
-    authErrorContainer.style.display = 'block';
-  }
-
-  function clearAuthError() {
-    authErrorContainer.style.display = 'none';
-  }
-
-  // ============================================================================
-  // GITHUB API FUNCTIONS
-  // ============================================================================
-  function getHeaders() {
-    const h = { 'Accept': 'application/vnd.github.v3+json' };
-    if (token) h['Authorization'] = `Bearer ${token}`;
-    return h;
-  }
-
-  function shouldShowAuthError(response) {
-    if (!token) return false;
-    return response.status === 401 || response.status === 403;
-  }
-
-  async function handleAuthError(response) {
-    let errorMsg = 'Your GitHub token is invalid or has insufficient permissions.';
-    
-    if (response.status === 401) {
-      errorMsg = 'GitHub authentication failed. Your token may be invalid or expired.';
-    } else if (response.status === 403) {
-      try {
-        const body = await response.json();
-        if (body.message && body.message.includes('API rate limit')) {
-          errorMsg = 'GitHub API rate limit exceeded. Wait an hour or use a valid token.';
-        } else if (body.message && body.message.includes('Resource not accessible')) {
-          errorMsg = 'Token does not have access to this repository. Check token permissions and organization settings.';
-        } else {
-          errorMsg = 'GitHub access forbidden. Your token may lack necessary permissions or organization approval.';
-        }
-      } catch {
-        errorMsg = 'GitHub access forbidden. Your token may lack necessary permissions.';
-      }
-    }
-    
-    showAuthError(errorMsg);
-  }
-
-  function parseUrl(url) {
-    try {
-      const u = new URL(url);
-      if (u.hostname !== 'github.com') return null;
-      const parts = u.pathname.split('/').filter(p=>p);
-      if (parts.length<2) return null;
-      return { owner: parts[0], repo: parts[1] };
-    } catch {
-      return null;
-    }
-  }
-
-  async function fetchBranches(owner, repo) {
-    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, { headers: getHeaders() });
-    if (!r.ok) {
-      if (shouldShowAuthError(r)) await handleAuthError(r);
-      throw new Error(r.statusText);
-    }
-    return (await r.json()).map(b=>b.name);
-  }
-
-  async function fetchDefaultBranch(owner,repo) {
-    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: getHeaders() });
-    if (!r.ok) {
-      if (shouldShowAuthError(r)) await handleAuthError(r);
-      throw new Error(r.statusText);
-    }
-    const j = await r.json();
-    return j.default_branch || 'main';
-  }
-
-  async function fetchLastCommit(owner, repo, branch) {
-    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, { headers: getHeaders() });
-    if (!r.ok) {
-      if (shouldShowAuthError(r)) await handleAuthError(r);
-      throw new Error(r.statusText);
-    }
-    const j = await r.json();
-    return j.commit.message.split('\n')[0];
-  }
-
-  async function fetchContent(path){
-    const r = await fetch(
-      `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${currentRepo.branch}`,
-      { headers:getHeaders() }
-    );
-    if(!r.ok) {
-      if (shouldShowAuthError(r)) await handleAuthError(r);
-      throw new Error(r.statusText);
-    }
-    const j = await r.json();
-    if(j.encoding!=='base64') throw new Error('Bad encoding');
-    return atob(j.content);
-  }
-
-  // ============================================================================
-  // TREE BUILDING & RENDERING
-  // ============================================================================
-  function buildTree(items) {
-    const root = { children: {} };
-    items.filter(i=>i.type==='blob'||i.type==='tree')
-      .sort((a,b)=>a.path.localeCompare(b.path))
-      .forEach(i=>{
-        const parts = i.path.split('/');
-        let cur = root.children, acc = [];
-        parts.forEach((p,idx)=>{
-          acc.push(p);
-          const path = acc.join('/');
-          const isFile = idx===parts.length-1 && i.type==='blob';
-          if (!cur[p]) cur[p] = { name:p, type:isFile?'file':'dir', path, children:isFile?null:{} };
-          if (cur[p].type==='dir') cur = cur[p].children;
-        });
-      });
-    return root;
-  }
-
-  function renderTree(node, container) {
-    if (!node.children) return;
-    const ul = document.createElement('ul'); ul.className = 'file-tree-root';
-    Object.values(node.children).sort((a,b)=>{
-      if(a.type==='dir'&&b.type==='file') return -1;
-      if(a.type==='file'&&b.type==='dir') return 1;
-      return a.name.localeCompare(b.name);
-    }).forEach(c=>ul.appendChild(nodeToElement(c)));
-    container.appendChild(ul);
-  }
-
-  function isImageFile(name) {
-    return /\.(png|jpe?g|gif|bmp|svg|webp|ico|tif|tiff)$/i.test(name);
-  }
-
-  function nodeToElement(n) {
-    const li = document.createElement('li');
-    li.className = `file-tree-node node-type-${n.type}`;
-    li.dataset.nodePath = n.path;
-    const d = document.createElement('div');
-    d.className = 'node-content';
-
-    if (n.type === 'dir') {
-      const t = document.createElement('span');
-      t.className = 'dir-toggle';
-      t.textContent = '►';
-      t.onclick = e => {
-        e.stopPropagation();
-        const sub = li.querySelector('ul');
-        if (!sub) return;
-        const show = sub.style.display !== 'block';
-        sub.style.display = show ? 'block' : 'none';
-        t.classList.toggle('open', show);
-      };
-      d.appendChild(t);
-    }
-
-    if (n.type === 'file' && isImageFile(n.name)) {
-      const lbl = document.createElement('label');
-      lbl.textContent = n.name;
-      lbl.style.opacity = '0.6';
-      d.appendChild(lbl);
-    } else {
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = n.path;
-      cb.dataset.nodeType = n.type;
-      cb.id = `cb-${n.path.replace(/[^A-Za-z0-9_.-]/g,'_')}`;
-      const lbl = document.createElement('label');
-      lbl.htmlFor = cb.id;
-      lbl.textContent = n.name;
-      if (n.type === 'dir') lbl.className = 'dir-label';
-      d.appendChild(cb);
-      d.appendChild(lbl);
-      if (n.type === 'file') {
-        const ld = document.createElement('span');
-        ld.className = 'loading-indicator';
-        ld.textContent = 'loading...';
-        d.appendChild(ld);
-        cb.onchange = onFileChange;
-      } else {
-        cb.onchange = onDirChange;
-      }
-    }
-
-    li.appendChild(d);
-
-    if (n.type === 'dir' && n.children) {
-      const sub = document.createElement('ul');
-      sub.style.display = 'none';
-      Object.values(n.children).sort((a,b)=>{
-        if(a.type==='dir'&&b.type==='file') return -1;
-        if(a.type==='file'&&b.type==='dir') return 1;
-        return a.name.localeCompare(b.name);
-      }).forEach(c=>sub.appendChild(nodeToElement(c)));
-      li.appendChild(sub);
-    }
-    return li;
-  }
-
-  // ============================================================================
-  // FILE/DIRECTORY CHANGE HANDLERS
-  // ============================================================================
-  async function onFileChange(e){
-    const cb=e.target, path=cb.value, li=cb.closest('.file-tree-node');
-    if(cb.checked && !fileCache[path]){
-      li.classList.add('is-loading');
-      try {
-        fileCache[path] = await fetchContent(path);
-      } catch {
-        cb.checked=false;
-      } finally {
-        li.classList.remove('is-loading');
-      }
-    }
-    renderOutput(); 
-    updateParents(cb);
-    updateSelectAllButton();
-  }
-
-  async function onDirChange(e){
-    const dirCb=e.target, checked=dirCb.checked, li=dirCb.closest('.file-tree-node');
-    const all = li.querySelectorAll('input[type="checkbox"]'), toFetch=[];
-    all.forEach(cb=>{
-      cb.checked=checked; cb.indeterminate=false;
-      if(checked&&cb.dataset.nodeType==='file'&&!fileCache[cb.value]) toFetch.push(cb.value);
-    });
-    if(toFetch.length){
-      showLoading(`Fetching ${toFetch.length} files…`);
-      await Promise.all(toFetch.map(async p=>{
-        try { fileCache[p]=await fetchContent(p); }
-        catch{/*ignore*/}
-      }));
-      clearStatus();
-    }
-    renderOutput(); 
-    updateParents(dirCb);
-    updateSelectAllButton();
-  }
-
-  function updateParents(cb){
-    let ul=cb.closest('ul');
-    while(ul && !ul.classList.contains('file-tree-root')){
-      const pLi=ul.parentElement, pCb=pLi.querySelector('> .node-content input[type="checkbox"]');
-      const children= pLi.querySelectorAll('> ul input[type="checkbox"]');
-      const total=children.length, checked=[...children].filter(x=>x.checked).length;
-      if(checked===0){ pCb.checked=false; pCb.indeterminate=false; }
-      else if(checked===total){ pCb.checked=true; pCb.indeterminate=false; }
-      else{ pCb.checked=false; pCb.indeterminate=true; }
-      ul=pLi.closest('ul');
-    }
-  }
-
-  function updateSelectAllButton() {
-    const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
-    if (allCheckboxes.length === 0) {
-      selectAllBtn.textContent = 'Select All';
-      return;
-    }
-    const allChecked = [...allCheckboxes].every(cb => cb.checked);
-    
-    if (allChecked) {
-      selectAllBtn.textContent = 'Deselect All';
-    } else {
-      selectAllBtn.textContent = 'Select All';
-    }
-  }
-
-  // ============================================================================
-  // OUTPUT RENDERING
-  // ============================================================================
-  function renderOutput(){
-    let out = userInstructions.value || '';
-    fileListContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb=>{
-      if(cb.dataset.nodeType==='file'&&fileCache[cb.value]){
-        out += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
-      }
-    });
-    outputMessage.value = out;
-  }
-
-  function updatePromptHeader() {
-    if (!currentRepo) return;
-    const header = `This is code context for the ${currentRepo.owner}/${currentRepo.repo} repository (branch: ${currentRepo.branch}).`;
-    const suffix = "RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE";
-    const headerPrefix = "This is code context for the";
-
-    let currentVal = userInstructions.value;
-    const cleanVal = currentVal.trim();
-
-    if (cleanVal === suffix || cleanVal === "") {
-      userInstructions.value = `${header}\n\n${suffix}`;
-    } 
-    else if (currentVal.startsWith(headerPrefix)) {
-      const lines = currentVal.split('\n');
-      lines[0] = header;
-      userInstructions.value = lines.join('\n');
-    } 
-    else {
-      userInstructions.value = `${header}\n\n${currentVal}`;
-    }
-    renderOutput();
-  }
-
-  async function updateCommitInfo() {
-    if (!currentRepo) {
-      commitInfo.textContent = '';
-      return;
-    }
-    try {
-      const message = await fetchLastCommit(currentRepo.owner, currentRepo.repo, currentRepo.branch);
-      commitInfo.textContent = `Latest commit: ${message}`;
-    } catch {
-      commitInfo.textContent = '';
-    }
-  }
-
-  async function loadTree() {
-    showLoading(`Fetching tree (${currentRepo.branch})…`);
-    fetchFilesBtn.disabled = true;
-    selectAllBtn.disabled = true;
-    fileListContainer.innerHTML = '<p>Fetching files…</p>';
-    try {
-      const r = await fetch(
-        `https://api.github.com/repos/${currentRepo.owner}/${currentRepo.repo}/git/trees/${currentRepo.branch}?recursive=1`,
-        { headers:getHeaders() }
-      );
-      if (!r.ok) {
-        if (shouldShowAuthError(r)) await handleAuthError(r);
-        throw new Error(r.statusText);
-      }
-      const data = await r.json();
-      fileListContainer.innerHTML = '';
-      if (data.truncated) {
-        fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated.</div>`;
-      }
-      if (!data.tree || !data.tree.length) {
-        fileListContainer.innerHTML += '<p>No files found.</p>';
-      } else {
-        const tree = buildTree(data.tree);
-        renderTree(tree, fileListContainer);
-        selectAllBtn.disabled = false;
-        updateSelectAllButton();
-      }
-    } catch (e) {
-      showError(`Fetch error: ${e.message}`);
-      fileListContainer.innerHTML = '<p>Could not fetch files.</p>';
-    } finally {
-      clearStatus();
-      fetchFilesBtn.disabled = false;
-      renderOutput();
-    }
-  }
-
-  // ============================================================================
-  // MAIN EVENT LISTENERS
-  // ============================================================================
-  githubPatInput.addEventListener('input', () => {
-    token = githubPatInput.value.trim() || null;
-    clearAuthError();
-  });
-
-  userInstructions.addEventListener('input', renderOutput);
-
-  fetchFilesBtn.addEventListener('click', async () => {
-    clearStatus();
-    clearAuthError();
-    const url = repoUrlInput.value.trim();
-    const info = parseUrl(url);
-    if (!info) { showError('Invalid GitHub URL.'); return; }
-
-    showLoading('Loading branches…');
-    branchSelect.disabled = true;
-    try {
-      const [branches, def] = await Promise.all([
-        fetchBranches(info.owner, info.repo),
-        fetchDefaultBranch(info.owner, info.repo)
-      ]);
-      branchSelect.innerHTML = branches
-        .map(b=>`<option value="${b}"${b===def?' selected':''}>${b}</option>`)
-        .join('');
-      branchSelect.disabled = false;
-      currentRepo = { ...info, branch: branchSelect.value };
-      fileCache = {};
-      
-      await updateCommitInfo();
-      updatePromptHeader();
-      loadTree();
-    } catch (e) {
-      showError(`Branch error: ${e.message}`);
-    } finally {
-      clearStatus();
-    }
-  });
-
-  branchSelect.addEventListener('change', async () => {
-    if (!currentRepo) return;
-    currentRepo.branch = branchSelect.value;
-    fileCache = {};
-    await updateCommitInfo();
-    updatePromptHeader();
-    loadTree();
-  });
-
-  selectAllBtn.addEventListener('click', async () => {
-    const allCheckboxes = fileListContainer.querySelectorAll('input[type="checkbox"]');
-    const allChecked = [...allCheckboxes].every(cb => cb.checked);
-    
-    if (allChecked) {
-      allCheckboxes.forEach(cb => {
-        cb.checked = false;
-        cb.indeterminate = false;
-      });
-      renderOutput();
-    } else {
-      const toFetch = [];
-      allCheckboxes.forEach(cb => {
-        cb.checked = true;
-        cb.indeterminate = false;
-        if (cb.dataset.nodeType === 'file' && !fileCache[cb.value]) {
-          toFetch.push(cb.value);
-        }
-      });
-      
-      if (toFetch.length) {
-        showLoading(`Fetching ${toFetch.length} files…`);
-        await Promise.all(toFetch.map(async p => {
-          try { 
-            fileCache[p] = await fetchContent(p); 
-          } catch {
-            /* ignore */
-          }
-        }));
-        clearStatus();
-      }
-      
-      renderOutput();
-    }
-    updateSelectAllButton();
-  });
-
-  copyBtn.addEventListener('click', ()=>{
-    if(!outputMessage.value){ showError('Nothing to copy.'); setTimeout(clearStatus,2000); return; }
-    navigator.clipboard.writeText(outputMessage.value)
-      .then(_=>{ copyBtn.textContent='Copied!'; setTimeout(_=>copyBtn.textContent='Copy to Clipboard',1500); })
-      .catch(_=>{ showError('Copy failed.'); });
-  });
-
-  // ============================================================================
-  // MULTI-MESSAGE MODE (HARD-CODED FOR NEUROFOLD)
-  // ============================================================================
-  let multiMessageConfig = {
-    backendPath: 'backend',
-    frontendPath: 'frontend',
-    componentsPath: 'frontend/src/components',
-    graphSubdirs: [
-      'frontend/src/components/graph',
-      'frontend/src/components/graph2d',
-      'frontend/src/components/graph_semantic',
-      'frontend/src/components/graph_geometric'
-    ],
-    holdingResponse: 'We are building a decentralized collective intelligence'
-  };
-
-  const multiModeToggle = document.getElementById('multiModeToggle');
-  const multiModeConfig = document.getElementById('multiModeConfig');
-  const generateMultiBtn = document.getElementById('generateMultiBtn');
-  const advancedPathsToggle = document.getElementById('advancedPathsToggle');
-  const advancedPathsConfig = document.getElementById('advancedPathsConfig');
-
-  if (multiModeToggle) {
-    multiModeToggle.addEventListener('change', (e) => {
-      if (multiModeConfig) {
-        multiModeConfig.style.display = e.target.checked ? 'block' : 'none';
-      }
-    });
-  }
-
-  if (advancedPathsToggle) {
-    advancedPathsToggle.addEventListener('change', (e) => {
-      if (advancedPathsConfig) {
-        advancedPathsConfig.style.display = e.target.checked ? 'block' : 'none';
-      }
-    });
-  }
-
-  if (generateMultiBtn) {
-    generateMultiBtn.textContent = 'Generate 4 Messages';
-    
-    generateMultiBtn.addEventListener('click', async () => {
-      if (!currentRepo) {
-        showError('Please fetch files first.');
-        setTimeout(clearStatus, 2000);
-        return;
-      }
-
-      // Update config from inputs
-      const backendPathInput = document.getElementById('backendPath');
-      const frontendPathInput = document.getElementById('frontendPath');
-      const componentsPathInput = document.getElementById('componentsPath');
-      const holdingResponseInput = document.getElementById('holdingResponse');
-
-      if (backendPathInput) multiMessageConfig.backendPath = backendPathInput.value.trim();
-      if (frontendPathInput) multiMessageConfig.frontendPath = frontendPathInput.value.trim();
-      if (componentsPathInput) multiMessageConfig.componentsPath = componentsPathInput.value.trim();
-      if (holdingResponseInput) multiMessageConfig.holdingResponse = holdingResponseInput.value.trim();
-
-      // Auto-select and fetch all required files
-      showLoading('Fetching all required files for multi-message mode...');
-      
-      const allCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'));
-      const toFetch = [];
-      
-      // Select all backend files
-      allCheckboxes.forEach(cb => {
-        if (cb.value.startsWith(multiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file') {
-          cb.checked = true;
-          if (!fileCache[cb.value]) toFetch.push(cb.value);
-        }
-      });
-      
-      // Select all frontend files
-      allCheckboxes.forEach(cb => {
-        if (cb.value.startsWith(multiMessageConfig.frontendPath + '/') && cb.dataset.nodeType === 'file') {
-          cb.checked = true;
-          if (!fileCache[cb.value]) toFetch.push(cb.value);
-        }
-      });
-      
-      // Fetch all files
-      if (toFetch.length) {
-        await Promise.all(toFetch.map(async p => {
-          try { 
-            fileCache[p] = await fetchContent(p); 
-          } catch {
-            /* ignore */
-          }
-        }));
-      }
-      
-      clearStatus();
-
-      const messages = [
-        generateMessage1(),
-        generateMessage2(),
-        generateMessage3(),
-        generateMessage4()
-      ];
-
-      displayMultiMessages(messages);
-    });
-  }
-
-  function generateMessage1() {
-    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the backend for ${repoName}.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${multiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
+const MultiMessage = {
+  generateMessage1() {
+    const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere's the backend for ${repoName}.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
     
     let content = header;
-    
-    const backendCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => cb.value.startsWith(multiMessageConfig.backendPath + '/') && 
-                    cb.dataset.nodeType === 'file' && 
-                    cb.checked);
+    const backendCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => cb.value.startsWith(MultiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file' && cb.checked);
     
     backendCheckboxes.forEach(cb => {
-      if (fileCache[cb.value]) {
-        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      if (GitHubAPI.fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
       }
     });
-    
     return content;
-  }
+  },
 
-  function generateMessage2() {
-    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the frontend without the components dir.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${multiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
+  generateMessage2() {
+    const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere's the frontend without the components dir.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
     
     let content = header;
-    
-    const frontendCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => cb.value.startsWith(multiMessageConfig.frontendPath + '/') && 
-                    !cb.value.startsWith(multiMessageConfig.componentsPath + '/') &&
-                    cb.dataset.nodeType === 'file' && 
-                    cb.checked);
+    const frontendCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => cb.value.startsWith(MultiMessageConfig.frontendPath + '/') && 
+                    !cb.value.startsWith(MultiMessageConfig.componentsPath + '/') &&
+                    cb.dataset.nodeType === 'file' && cb.checked);
     
     frontendCheckboxes.forEach(cb => {
-      if (fileCache[cb.value]) {
-        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      if (GitHubAPI.fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
       }
     });
-    
     return content;
-  }
+  },
 
-  function generateMessage3() {
-    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere are the graph visualization components (graph, graph2d, graph_semantic, graph_geometric).\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${multiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
+  generateMessage3() {
+    const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere are the graph visualization components (graph, graph2d, graph_semantic, graph_geometric).\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
     
-
-
     let content = header;
-    
-    const graphCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => {
-        return multiMessageConfig.graphSubdirs.some(subdir => 
-          cb.value.startsWith(subdir + '/') && cb.dataset.nodeType === 'file' && cb.checked
-        );
-      });
+    const graphCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => MultiMessageConfig.graphSubdirs.some(subdir => 
+        cb.value.startsWith(subdir + '/') && cb.dataset.nodeType === 'file' && cb.checked
+      ));
     
     graphCheckboxes.forEach(cb => {
-      if (fileCache[cb.value]) {
-        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      if (GitHubAPI.fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
       }
     });
-    
     return content;
-  }
+  },
 
-  function generateMessage4() {
-    const repoName = `${currentRepo.owner}/${currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${currentRepo.branch}).\n\nHere's the rest of the frontend components directory (excluding graph subdirectories).`;
+  generateMessage4() {
+    const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
+    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere's the rest of the frontend components directory (excluding graph subdirectories).`;
     
     let content = header;
-    
-    const componentCheckboxes = Array.from(fileListContainer.querySelectorAll('input[type="checkbox"]'))
+    const componentCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
       .filter(cb => {
-        if (!cb.value.startsWith(multiMessageConfig.componentsPath + '/') || 
-            cb.dataset.nodeType !== 'file' || 
-            !cb.checked) {
-          return false;
-        }
-        
-        // Exclude the 4 graph subdirectories
-        return !multiMessageConfig.graphSubdirs.some(subdir => cb.value.startsWith(subdir + '/'));
+        if (!cb.value.startsWith(MultiMessageConfig.componentsPath + '/') || 
+            cb.dataset.nodeType !== 'file' || !cb.checked) return false;
+        return !MultiMessageConfig.graphSubdirs.some(subdir => cb.value.startsWith(subdir + '/'));
       });
     
     componentCheckboxes.forEach(cb => {
-      if (fileCache[cb.value]) {
-        content += `\n\n---\n\n${cb.value}\n\n---\n\n${fileCache[cb.value]}`;
+      if (GitHubAPI.fileCache[cb.value]) {
+        content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
       }
     });
     
-    const instructions = userInstructions.value.trim();
+    const instructions = UI.elements.userInstructions.value.trim();
     const lines = instructions.split('\n');
     const userContent = lines.filter(line => !line.startsWith('This is code context')).join('\n').trim();
     
     if (userContent && userContent !== 'RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE') {
       content += `\n\n${userContent}`;
     }
-    
     return content;
-  }
+  },
 
-  function displayMultiMessages(messages) {
-    const container = document.getElementById('multiMessagesOutput');
+  displayMessages(messages) {
+    const container = UI.elements.multiMessagesOutput;
     if (!container) return;
     
     container.innerHTML = '';
-    
     messages.forEach((msg, idx) => {
       const msgDiv = document.createElement('div');
       msgDiv.className = 'multi-message-block';
@@ -735,6 +126,183 @@ document.addEventListener('DOMContentLoaded', async () => {
       msgDiv.appendChild(textarea);
       msgDiv.appendChild(copyBtn);
       container.appendChild(msgDiv);
+    });
+  }
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  GitHubAPI.init();
+  UI.init();
+  
+  if (GitHubAPI.token && UI.elements.patContainer) {
+    UI.elements.patContainer.style.display = 'none';
+  }
+  
+  UI.elements.githubPatInput.addEventListener('input', () => {
+    GitHubAPI.setToken(UI.elements.githubPatInput.value.trim() || null);
+    UI.clearAuthError();
+  });
+
+  UI.elements.userInstructions.addEventListener('input', () => UI.renderOutput());
+
+  UI.elements.fetchFilesBtn.addEventListener('click', async () => {
+    UI.clearStatus();
+    UI.clearAuthError();
+    const url = UI.elements.repoUrlInput.value.trim();
+    const info = GitHubAPI.parseUrl(url);
+    if (!info) { UI.showError('Invalid GitHub URL.'); return; }
+
+    UI.showLoading('Loading branches…');
+    UI.elements.branchSelect.disabled = true;
+    try {
+      const [branchResult, defResult] = await Promise.all([
+        GitHubAPI.fetchBranches(info.owner, info.repo),
+        GitHubAPI.fetchDefaultBranch(info.owner, info.repo)
+      ]);
+      
+      UI.elements.branchSelect.innerHTML = branchResult.branches
+        .map(b => `<option value="${b}"${b === defResult.defaultBranch ? ' selected' : ''}>${b}</option>`)
+        .join('');
+      UI.elements.branchSelect.disabled = false;
+      GitHubAPI.currentRepo = { ...info, branch: UI.elements.branchSelect.value };
+      GitHubAPI.fileCache = {};
+      
+      await UI.updateCommitInfo();
+      UI.updatePromptHeader();
+      UI.loadTree();
+    } catch (e) {
+      UI.showError(`Branch error: ${e.message}`);
+    } finally {
+      UI.clearStatus();
+    }
+  });
+
+  UI.elements.branchSelect.addEventListener('change', async () => {
+    if (!GitHubAPI.currentRepo) return;
+    GitHubAPI.currentRepo.branch = UI.elements.branchSelect.value;
+    GitHubAPI.fileCache = {};
+    await UI.updateCommitInfo();
+    UI.updatePromptHeader();
+    UI.loadTree();
+  });
+
+  UI.elements.selectAllBtn.addEventListener('click', async () => {
+    const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
+    const allChecked = [...allCheckboxes].every(cb => cb.checked);
+    
+    if (allChecked) {
+      allCheckboxes.forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+      UI.renderOutput();
+    } else {
+      const toFetch = [];
+      allCheckboxes.forEach(cb => {
+        cb.checked = true; cb.indeterminate = false;
+        if (cb.dataset.nodeType === 'file' && !GitHubAPI.fileCache[cb.value]) toFetch.push(cb.value);
+      });
+      
+      if (toFetch.length) {
+        UI.showLoading(`Fetching ${toFetch.length} files…`);
+        await Promise.all(toFetch.map(async p => {
+          try {
+            const { content } = await GitHubAPI.fetchContent(p);
+            GitHubAPI.fileCache[p] = content;
+          } catch { /* ignore */ }
+        }));
+        UI.clearStatus();
+      }
+      UI.renderOutput();
+    }
+    UI.updateSelectAllButton();
+  });
+
+  UI.elements.copyBtn.addEventListener('click', () => {
+    if (!UI.elements.outputMessage.value) {
+      UI.showError('Nothing to copy.');
+      setTimeout(() => UI.clearStatus(), 2000);
+      return;
+    }
+    navigator.clipboard.writeText(UI.elements.outputMessage.value)
+      .then(() => {
+        UI.elements.copyBtn.textContent = 'Copied!';
+        setTimeout(() => UI.elements.copyBtn.textContent = 'Copy to Clipboard', 1500);
+      })
+      .catch(() => UI.showError('Copy failed.'));
+  });
+
+  if (UI.elements.multiModeToggle) {
+    UI.elements.multiModeToggle.addEventListener('change', (e) => {
+      if (UI.elements.multiModeConfig) {
+        UI.elements.multiModeConfig.style.display = e.target.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  if (UI.elements.advancedPathsToggle) {
+    UI.elements.advancedPathsToggle.addEventListener('change', (e) => {
+      if (UI.elements.advancedPathsConfig) {
+        UI.elements.advancedPathsConfig.style.display = e.target.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  if (UI.elements.generateMultiBtn) {
+    UI.elements.generateMultiBtn.textContent = 'Generate 4 Messages';
+    
+    UI.elements.generateMultiBtn.addEventListener('click', async () => {
+      if (!GitHubAPI.currentRepo) {
+        UI.showError('Please fetch files first.');
+        setTimeout(() => UI.clearStatus(), 2000);
+        return;
+      }
+
+      const backendPathInput = document.getElementById('backendPath');
+      const frontendPathInput = document.getElementById('frontendPath');
+      const componentsPathInput = document.getElementById('componentsPath');
+      const holdingResponseInput = document.getElementById('holdingResponse');
+
+      if (backendPathInput) MultiMessageConfig.backendPath = backendPathInput.value.trim();
+      if (frontendPathInput) MultiMessageConfig.frontendPath = frontendPathInput.value.trim();
+      if (componentsPathInput) MultiMessageConfig.componentsPath = componentsPathInput.value.trim();
+      if (holdingResponseInput) MultiMessageConfig.holdingResponse = holdingResponseInput.value.trim();
+
+      UI.showLoading('Fetching all required files for multi-message mode...');
+      
+      const allCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'));
+      const toFetch = [];
+      
+      allCheckboxes.forEach(cb => {
+        if (cb.value.startsWith(MultiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file') {
+          cb.checked = true;
+          if (!GitHubAPI.fileCache[cb.value]) toFetch.push(cb.value);
+        }
+      });
+      
+      allCheckboxes.forEach(cb => {
+        if (cb.value.startsWith(MultiMessageConfig.frontendPath + '/') && cb.dataset.nodeType === 'file') {
+          cb.checked = true;
+          if (!GitHubAPI.fileCache[cb.value]) toFetch.push(cb.value);
+        }
+      });
+      
+      if (toFetch.length) {
+        await Promise.all(toFetch.map(async p => {
+          try {
+            const { content } = await GitHubAPI.fetchContent(p);
+            GitHubAPI.fileCache[p] = content;
+          } catch { /* ignore */ }
+        }));
+      }
+      
+      UI.clearStatus();
+
+      const messages = [
+        MultiMessage.generateMessage1(),
+        MultiMessage.generateMessage2(),
+        MultiMessage.generateMessage3(),
+        MultiMessage.generateMessage4()
+      ];
+
+      MultiMessage.displayMessages(messages);
     });
   }
 });
