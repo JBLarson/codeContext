@@ -230,7 +230,7 @@ const UI = {
   updatePromptHeader() {
     if (!GitHubAPI.currentRepo) return;
     const header = `This is code context for the ${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo} repository (branch: ${GitHubAPI.currentRepo.branch}).`;
-    const suffix = "RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE";
+    const suffix = "RESPOND WITH COMPLETE FILES";
     const headerPrefix = "This is code context for the";
 
     let currentVal = this.elements.userInstructions.value;
