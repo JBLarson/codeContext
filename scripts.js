@@ -88,7 +88,7 @@ const MultiMessage = {
     const lines = instructions.split('\n');
     const userContent = lines.filter(line => !line.startsWith('This is code context')).join('\n').trim();
     
-    if (userContent && userContent !== 'RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE') {
+    if (userContent && userContent !== '') {
       content += `\n\n${userContent}`;
     }
     return content;
@@ -109,11 +109,15 @@ const MultiMessage = {
       
       const textarea = document.createElement('textarea');
       textarea.className = 'multi-message-textarea';
+      textarea.style.width = '100%'; 
       textarea.value = msg;
       textarea.readOnly = true;
       
       const copyBtn = document.createElement('button');
       copyBtn.textContent = 'Copy Message ' + (idx + 1);
+      copyBtn.className = 'btn-primary';
+      copyBtn.style.marginTop = '10px';
+      
       copyBtn.onclick = () => {
         navigator.clipboard.writeText(msg).then(() => {
           const original = copyBtn.textContent;
@@ -152,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const info = GitHubAPI.parseUrl(url);
     if (!info) { UI.showError('Invalid GitHub URL.'); return; }
 
-    UI.showLoading('Loading branches…');
+    UI.showLoading('Loading branches...');
     UI.elements.branchSelect.disabled = true;
     try {
       const [branchResult, defResult] = await Promise.all([
@@ -186,34 +190,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     UI.loadTree();
   });
 
+  // --- Select / Deselect Logic ---
+  
+  // Select All
   UI.elements.selectAllBtn.addEventListener('click', async () => {
     const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
-    const allChecked = [...allCheckboxes].every(cb => cb.checked);
-    
-    if (allChecked) {
-      allCheckboxes.forEach(cb => { cb.checked = false; cb.indeterminate = false; });
-      UI.renderOutput();
-    } else {
-      const toFetch = [];
-      allCheckboxes.forEach(cb => {
-        cb.checked = true; cb.indeterminate = false;
-        if (cb.dataset.nodeType === 'file' && !GitHubAPI.fileCache[cb.value]) toFetch.push(cb.value);
-      });
-      
-      if (toFetch.length) {
-        UI.showLoading(`Fetching ${toFetch.length} files…`);
-        await Promise.all(toFetch.map(async p => {
-          try {
-            const { content } = await GitHubAPI.fetchContent(p);
-            GitHubAPI.fileCache[p] = content;
-          } catch { /* ignore */ }
-        }));
-        UI.clearStatus();
-      }
-      UI.renderOutput();
+    const toFetch = [];
+
+    // 1. Mark all as checked immediately
+    allCheckboxes.forEach(cb => {
+        cb.checked = true;
+        cb.indeterminate = false;
+        // If file & not cached, queue for fetch
+        if (cb.dataset.nodeType === 'file' && !GitHubAPI.fileCache[cb.value]) {
+            toFetch.push(cb.value);
+        }
+    });
+
+    // 2. Fetch if needed
+    if (toFetch.length) {
+      UI.showLoading(`Fetching ${toFetch.length} files...`);
+      // Optional: Batch this if it's huge, but Promise.all is okay for moderate sizes
+      await Promise.all(toFetch.map(async p => {
+        try {
+          const { content } = await GitHubAPI.fetchContent(p);
+          GitHubAPI.fileCache[p] = content;
+        } catch { /* ignore individual fail */ }
+      }));
+      UI.clearStatus();
     }
-    UI.updateSelectAllButton();
+
+    UI.renderOutput();
   });
+
+  // Deselect All
+  UI.elements.deselectAllBtn.addEventListener('click', () => {
+    const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
+    allCheckboxes.forEach(cb => {
+        cb.checked = false;
+        cb.indeterminate = false;
+    });
+    UI.renderOutput();
+  });
+
+  // --- End Select Logic ---
 
   UI.elements.copyBtn.addEventListener('click', () => {
     if (!UI.elements.outputMessage.value) {
@@ -270,6 +290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const allCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'));
       const toFetch = [];
       
+      // Auto-check backend
       allCheckboxes.forEach(cb => {
         if (cb.value.startsWith(MultiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file') {
           cb.checked = true;
@@ -277,6 +298,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
       
+      // Auto-check frontend
       allCheckboxes.forEach(cb => {
         if (cb.value.startsWith(MultiMessageConfig.frontendPath + '/') && cb.dataset.nodeType === 'file') {
           cb.checked = true;

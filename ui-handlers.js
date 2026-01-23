@@ -11,6 +11,7 @@ const UI = {
       commitInfo: document.getElementById('commitInfo'),
       fetchFilesBtn: document.getElementById('fetchFilesBtn'),
       selectAllBtn: document.getElementById('selectAllBtn'),
+      deselectAllBtn: document.getElementById('deselectAllBtn'), // New
       fileListContainer: document.getElementById('fileListContainer'),
       userInstructions: document.getElementById('userInstructions'),
       outputMessage: document.getElementById('outputMessage'),
@@ -98,7 +99,7 @@ const UI = {
     if (n.type === 'dir') {
       const t = document.createElement('span');
       t.className = 'dir-toggle';
-      t.textContent = '►';
+      t.textContent = '▶';
       t.onclick = e => {
         e.stopPropagation();
         const sub = li.querySelector('ul');
@@ -131,6 +132,7 @@ const UI = {
         const ld = document.createElement('span');
         ld.className = 'loading-indicator';
         ld.textContent = 'loading...';
+        ld.style.display = 'none';
         d.appendChild(ld);
         cb.onchange = e => this.onFileChange(e);
       } else {
@@ -156,7 +158,10 @@ const UI = {
   async onFileChange(e) {
     const cb = e.target, path = cb.value, li = cb.closest('.file-tree-node');
     if (cb.checked && !GitHubAPI.fileCache[path]) {
-      li.classList.add('is-loading');
+      // Show local loader
+      const loader = li.querySelector('.loading-indicator');
+      if (loader) loader.style.display = 'inline';
+      
       try {
         const { content, authError } = await GitHubAPI.fetchContent(path);
         GitHubAPI.fileCache[path] = content;
@@ -164,12 +169,11 @@ const UI = {
       } catch {
         cb.checked = false;
       } finally {
-        li.classList.remove('is-loading');
+        if (loader) loader.style.display = 'none';
       }
     }
     this.renderOutput();
     this.updateParents(cb);
-    this.updateSelectAllButton();
   },
 
   async onDirChange(e) {
@@ -182,8 +186,9 @@ const UI = {
         toFetch.push(cb.value);
       }
     });
+    
     if (toFetch.length) {
-      this.showLoading(`Fetching ${toFetch.length} files…`);
+      this.showLoading(`Fetching ${toFetch.length} files...`);
       await Promise.all(toFetch.map(async p => {
         try {
           const { content, authError } = await GitHubAPI.fetchContent(p);
@@ -195,7 +200,6 @@ const UI = {
     }
     this.renderOutput();
     this.updateParents(dirCb);
-    this.updateSelectAllButton();
   },
 
   updateParents(cb) {
@@ -211,16 +215,6 @@ const UI = {
       else { pCb.checked = false; pCb.indeterminate = true; }
       ul = pLi.closest('ul');
     }
-  },
-
-  updateSelectAllButton() {
-    const allCheckboxes = this.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
-    if (allCheckboxes.length === 0) {
-      this.elements.selectAllBtn.textContent = 'Select All';
-      return;
-    }
-    const allChecked = [...allCheckboxes].every(cb => cb.checked);
-    this.elements.selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
   },
   
   renderOutput() {
@@ -273,10 +267,12 @@ const UI = {
   },
   
   async loadTree() {
-    this.showLoading(`Fetching tree (${GitHubAPI.currentRepo.branch})…`);
+    this.showLoading(`Fetching tree (${GitHubAPI.currentRepo.branch})...`);
     this.elements.fetchFilesBtn.disabled = true;
     this.elements.selectAllBtn.disabled = true;
-    this.elements.fileListContainer.innerHTML = '<p>Fetching files…</p>';
+    this.elements.deselectAllBtn.disabled = true;
+    
+    this.elements.fileListContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:20px;">Fetching file list...</p>';
     try {
       const { tree: data, authError } = await GitHubAPI.fetchTree(
         GitHubAPI.currentRepo.owner,
@@ -288,15 +284,17 @@ const UI = {
       
       this.elements.fileListContainer.innerHTML = '';
       if (data.truncated) {
-        this.elements.fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated.</div>`;
+        this.elements.fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated (repo is huge).</div>`;
       }
       if (!data.tree || !data.tree.length) {
         this.elements.fileListContainer.innerHTML += '<p>No files found.</p>';
       } else {
         const tree = this.buildTree(data.tree);
         this.renderTree(tree, this.elements.fileListContainer);
+        
+        // Enable both buttons now that we have files
         this.elements.selectAllBtn.disabled = false;
-        this.updateSelectAllButton();
+        this.elements.deselectAllBtn.disabled = false;
       }
     } catch (e) {
       this.showError(`Fetch error: ${e.message}`);

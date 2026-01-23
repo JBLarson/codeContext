@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>codeContext</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
@@ -12,103 +15,100 @@
 
     <div id="authErrorContainer" style="display: none;">
       <div class="message-area error-message">
-        <strong>Authentication Error:</strong> <span id="authErrorMessage"></span>
-        <br><br>
-        <strong>Possible solutions:</strong>
-        <ul style="margin: 8px 0 0 20px; text-align: left;">
-          <li>Verify your PAT has the correct permissions (repo scope for private repos)</li>
-          <li>Check if your PAT has expired</li>
-          <li>For organization repos, ensure the org has approved PAT access</li>
-          <li>Try regenerating your token in GitHub settings</li>
-          <li>If using fine-grained tokens, switch to classic tokens with full repo scope</li>
-        </ul>
+        <strong>Authentication Error:</strong> <span id="authErrorMessage" style="margin-left:8px;"></span>
       </div>
     </div>
 
     <div class="form-group" id="patContainer">
-      <label for="githubPat">GitHub Personal Access Token (optional for public repos):</label>
-      <input type="password" id="githubPat" placeholder="Enter GitHub PAT for private repos…" />
+      <label for="githubPat">GitHub Personal Access Token (Private Repos)</label>
+      <input type="password" id="githubPat" placeholder="ghp_..." />
     </div>
 
-    <div class="form-group">
-      <label for="repoUrl">GitHub Repository URL:</label>
-      <input type="text" id="repoUrl" value="https://github.com/jblarson/neurofold" />
-    </div>
+    <div class="grid-2-1">
+        <div class="form-group">
+          <label for="repoUrl">GitHub Repository URL</label>
+          <input type="text" id="repoUrl" value="https://github.com/jblarson/neurofold" />
+        </div>
 
-    <div class="form-group">
-      <label for="branchSelect">Branch:</label>
-      <select id="branchSelect" disabled>
-        <option>Enter repo URL & click "Fetch Files"</option>
-      </select>
-      <div id="commitInfo" class="commit-info"></div>
+        <div class="form-group">
+          <label for="branchSelect">Branch</label>
+          <select id="branchSelect" disabled>
+            <option>Pending...</option>
+          </select>
+          <div id="commitInfo" style="margin-top: 6px; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);"></div>
+        </div>
     </div>
 
     <div class="button-group">
-      <button id="fetchFilesBtn">Fetch Files</button>
+      <button id="fetchFilesBtn" class="btn-primary">Fetch Files</button>
     </div>
 
     <div id="statusMessages"></div>
 
     <div class="form-group">
-      <div class="label-with-button">
-        <label>Select Files/Directories:</label>
-        <button id="selectAllBtn" class="select-all-btn" disabled>Select All</button>
+      <div class="utility-controls">
+        <label style="margin-bottom:0;">Repository Content</label>
+        <div class="action-bar">
+           <button id="selectAllBtn" class="btn-utility" disabled>Select</button>
+           <button id="deselectAllBtn" class="btn-utility" disabled>Deselect</button>
+        </div>
       </div>
+      
       <div id="fileListContainer">
-        <p>Enter URL and click "Fetch Files."</p>
+        <div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-dim);">
+          Enter URL and fetch to load file tree.
+        </div>
       </div>
     </div>
 
     <hr/>
 
     <div class="form-group">
-      <label for="userInstructions">Your Instructions/Prompt:</label>
-      <textarea id="userInstructions" placeholder="Type your prompt…">
-
-RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE</textarea>
+      <label for="userInstructions">Instructions / Prompt Context</label>
+      <textarea id="userInstructions" placeholder="explain auth flow..."></textarea>
     </div>
 
     <hr/>
 
     <div class="form-group">
-      <label>
-        <input type="checkbox" id="multiModeToggle" style="display: inline; width: auto; margin-right: 8px;">
-        Multi-Message Mode (for large codebases)
+      <label style="display: flex; align-items: center; cursor: pointer; color: var(--text-main);">
+        <input type="checkbox" id="multiModeToggle" style="width: auto; margin-right: 12px;">
+        Multi-Message Mode
       </label>
     </div>
 
     <div id="multiModeConfig" style="display: none;">
       <div class="form-group">
-        <label for="holdingResponse">Holding Response Text:</label>
+        <label for="holdingResponse">Holding Response Trigger</label>
         <input type="text" id="holdingResponse" value="We are building a decentralized collective intelligence" />
       </div>
       
       <div class="form-group">
-        <label>
-          <input type="checkbox" id="advancedPathsToggle" style="display: inline; width: auto; margin-right: 8px;">
+        <label style="display: flex; align-items: center; cursor: pointer; color: var(--text-main);">
+          <input type="checkbox" id="advancedPathsToggle" style="width: auto; margin-right: 12px;">
           Advanced Path Configuration
         </label>
       </div>
       
-      <div id="advancedPathsConfig" style="display: none; padding-left: 20px;">
+      <div id="advancedPathsConfig" style="display: none; padding-left: 20px; border-left: 1px solid var(--border-subtle); margin-top: 15px;">
         <div class="form-group">
-          <label for="backendPath">Backend Directory Path:</label>
+          <label for="backendPath">Backend Path</label>
           <input type="text" id="backendPath" value="backend" />
         </div>
         
         <div class="form-group">
-          <label for="frontendPath">Frontend Root Path:</label>
+          <label for="frontendPath">Frontend Path</label>
           <input type="text" id="frontendPath" value="frontend" />
         </div>
         
         <div class="form-group">
-          <label for="componentsPath">Components Path (to exclude in message 2):</label>
+          <label for="componentsPath">Components Path (Exclude Msg 2)</label>
           <input type="text" id="componentsPath" value="frontend/src/components" />
         </div>
       </div>
       
       <div class="button-group">
-        <button id="generateMultiBtn">Generate 3 Messages</button>
+        <button id="generateMultiBtn" class="btn-primary">Generate Messages</button>
       </div>
       
       <div id="multiMessagesOutput"></div>
@@ -117,12 +117,12 @@ RESPOND WITH COMPLETE FILES I CAN COPY AND PASTE</textarea>
     <hr/>
 
     <div class="form-group">
-      <label for="outputMessage">Generated Context:</label>
-      <textarea id="outputMessage"></textarea>
+      <label for="outputMessage">Generated Output</label>
+      <textarea id="outputMessage" readonly></textarea>
     </div>
 
     <div class="button-group">
-      <button id="copyBtn">Copy to Clipboard</button>
+      <button id="copyBtn" class="btn-primary">Copy to Clipboard</button>
     </div>
   </div>
 
