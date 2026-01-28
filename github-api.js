@@ -1,6 +1,7 @@
 // github-api.js
 const GitHubAPI = {
   token: null,
+  orgToken: null,
   currentRepo: null,
   fileCache: {},
   authErrorShown: false,
@@ -8,7 +9,13 @@ const GitHubAPI = {
   init() {
     if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN.trim().length > 0) {
       this.token = GITHUB_TOKEN.trim();
-      // Hide PAT container immediately if token exists
+    }
+    if (typeof GITHUB_TOKEN_ORG !== 'undefined' && GITHUB_TOKEN_ORG.trim().length > 0) {
+      this.orgToken = GITHUB_TOKEN_ORG.trim();
+    }
+    
+    // Hide PAT container if any token exists
+    if (this.token || this.orgToken) {
       const patContainer = document.getElementById('patContainer');
       if (patContainer) {
         patContainer.style.display = 'none';
@@ -21,9 +28,21 @@ const GitHubAPI = {
     this.authErrorShown = false;
   },
   
-  getHeaders() {
+  isNeurofoldRepo(owner) {
+    return owner && owner.toLowerCase() === 'neurofold';
+  },
+  
+  getActiveToken(owner) {
+    if (this.isNeurofoldRepo(owner) && this.orgToken) {
+      return this.orgToken;
+    }
+    return this.token;
+  },
+  
+  getHeaders(owner = null) {
     const h = { 'Accept': 'application/vnd.github.v3+json' };
-    if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+    const activeToken = this.getActiveToken(owner);
+    if (activeToken) h['Authorization'] = `Bearer ${activeToken}`;
     return h;
   },
   
@@ -50,8 +69,10 @@ const GitHubAPI = {
     return errorMsg;
   },
   
-  async fetchWithFallback(url, options = {}) {
-    if (this.token) {
+  async fetchWithFallback(url, owner = null, options = {}) {
+    const activeToken = this.getActiveToken(owner);
+    
+    if (activeToken) {
       const response = await fetch(url, options);
       
       if (response.ok) {
@@ -102,7 +123,8 @@ const GitHubAPI = {
   async fetchBranches(owner, repo) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}/branches`,
-      { headers: this.getHeaders() }
+      owner,
+      { headers: this.getHeaders(owner) }
     );
     if (!r.ok) throw new Error(r.statusText);
     return { branches: (await r.json()).map(b => b.name), authError };
@@ -111,7 +133,8 @@ const GitHubAPI = {
   async fetchDefaultBranch(owner, repo) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}`,
-      { headers: this.getHeaders() }
+      owner,
+      { headers: this.getHeaders(owner) }
     );
     if (!r.ok) throw new Error(r.statusText);
     const j = await r.json();
@@ -121,7 +144,8 @@ const GitHubAPI = {
   async fetchLastCommit(owner, repo, branch) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}/commits/${branch}`,
-      { headers: this.getHeaders() }
+      owner,
+      { headers: this.getHeaders(owner) }
     );
     if (!r.ok) throw new Error(r.statusText);
     const j = await r.json();
@@ -129,9 +153,11 @@ const GitHubAPI = {
   },
   
   async fetchContent(path) {
+    const owner = this.currentRepo?.owner;
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${this.currentRepo.owner}/${this.currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${this.currentRepo.branch}`,
-      { headers: this.getHeaders() }
+      owner,
+      { headers: this.getHeaders(owner) }
     );
     if (!r.ok) throw new Error(r.statusText);
     const j = await r.json();
@@ -142,7 +168,8 @@ const GitHubAPI = {
   async fetchTree(owner, repo, branch) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-      { headers: this.getHeaders() }
+      owner,
+      { headers: this.getHeaders(owner) }
     );
     if (!r.ok) throw new Error(r.statusText);
     return { tree: await r.json(), authError };
