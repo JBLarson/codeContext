@@ -2,6 +2,7 @@
 const GitHubAPI = {
   token: null,
   orgToken: null,
+  orgToken2: null,
   currentRepo: null,
   fileCache: {},
   authErrorShown: false,
@@ -13,9 +14,11 @@ const GitHubAPI = {
     if (typeof GITHUB_TOKEN_ORG !== 'undefined' && GITHUB_TOKEN_ORG.trim().length > 0) {
       this.orgToken = GITHUB_TOKEN_ORG.trim();
     }
+    if (typeof GITHUB_TOKEN_ORG2 !== 'undefined' && GITHUB_TOKEN_ORG2.trim().length > 0) {
+      this.orgToken2 = GITHUB_TOKEN_ORG2.trim();
+    }
     
-    // Hide PAT container if any token exists
-    if (this.token || this.orgToken) {
+    if (this.token || this.orgToken || this.orgToken2) {
       const patContainer = document.getElementById('patContainer');
       if (patContainer) {
         patContainer.style.display = 'none';
@@ -32,24 +35,34 @@ const GitHubAPI = {
     return owner && owner.toLowerCase() === 'neurofold';
   },
   
-  getActiveToken(owner) {
-    if (this.isNeurofoldRepo(owner) && this.orgToken) {
-      return this.orgToken;
+  getAllTokens(owner) {
+    const tokens = [];
+    
+    if (this.isNeurofoldRepo(owner)) {
+      if (this.orgToken) tokens.push(this.orgToken);
+      if (this.orgToken2) tokens.push(this.orgToken2);
+      if (this.token) tokens.push(this.token);
+    } else {
+      if (this.token) tokens.push(this.token);
+      if (this.orgToken) tokens.push(this.orgToken);
+      if (this.orgToken2) tokens.push(this.orgToken2);
     }
-    return this.token;
+    
+    return tokens;
   },
   
-  getHeaders(owner = null) {
+  getHeaders(token = null) {
     const h = { 'Accept': 'application/vnd.github.v3+json' };
-    const activeToken = this.getActiveToken(owner);
-    if (activeToken) h['Authorization'] = `Bearer ${activeToken}`;
+    if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
   },
   
   async handleAuthError(response) {
     let errorMsg = 'Your GitHub token is invalid or has insufficient permissions.';
     
-    if (response.status === 401) {
+    if (response.status === 404) {
+      errorMsg = 'Repository not found or you do not have access. Check that: 1) The repo URL is correct, 2) Your PAT has access to this organization, 3) The PAT has been authorized for SSO if required.';
+    } else if (response.status === 401) {
       errorMsg = 'GitHub authentication failed. Your token may be invalid or expired.';
     } else if (response.status === 403) {
       try {
@@ -70,42 +83,45 @@ const GitHubAPI = {
   },
   
   async fetchWithFallback(url, owner = null, options = {}) {
-    const activeToken = this.getActiveToken(owner);
+    const tokens = this.getAllTokens(owner);
+    let lastResponse = null;
     
-    if (activeToken) {
-      const response = await fetch(url, options);
+    for (const token of tokens) {
+      const response = await fetch(url, {
+        ...options,
+        headers: this.getHeaders(token)
+      });
       
       if (response.ok) {
         return { response, authError: null };
       }
       
+      lastResponse = response;
+      
       if (response.status === 401 || response.status === 403) {
-        console.log('Auth failed with token, attempting without token for public repo...');
-        
-        // Fetch WITHOUT any auth headers - completely fresh request
-        const publicResponse = await fetch(url, {
-          headers: { 'Accept': 'application/vnd.github.v3+json' }
-        });
-        
-        if (publicResponse.ok) {
-          // Only return authError once per session
-          const authError = this.authErrorShown ? null : 'Token is invalid. Fetching as public repo instead. Fix or remove your token.';
-          this.authErrorShown = true;
-          return { response: publicResponse, authError };
-        }
-        
-        const errorMsg = await this.handleAuthError(response);
-        return { response, authError: errorMsg };
+        continue;
+      }
+      
+      if (response.status === 404) {
+        continue;
       }
       
       return { response, authError: null };
     }
     
-    // No token: just fetch normally
-    const response = await fetch(url, { 
-      headers: { 'Accept': 'application/vnd.github.v3+json' } 
+    console.log('All tokens failed, attempting public access...');
+    const publicResponse = await fetch(url, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' }
     });
-    return { response, authError: null };
+    
+    if (publicResponse.ok) {
+      const authError = this.authErrorShown ? null : 'All tokens failed. Fetching as public repo instead. Check your token permissions.';
+      this.authErrorShown = true;
+      return { response: publicResponse, authError };
+    }
+    
+    const errorMsg = await this.handleAuthError(lastResponse || publicResponse);
+    return { response: lastResponse || publicResponse, authError: errorMsg };
   },
   
   parseUrl(url) {
@@ -123,8 +139,7 @@ const GitHubAPI = {
   async fetchBranches(owner, repo) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}/branches`,
-      owner,
-      { headers: this.getHeaders(owner) }
+      owner
     );
     if (!r.ok) throw new Error(r.statusText);
     return { branches: (await r.json()).map(b => b.name), authError };
@@ -133,8 +148,7 @@ const GitHubAPI = {
   async fetchDefaultBranch(owner, repo) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}`,
-      owner,
-      { headers: this.getHeaders(owner) }
+      owner
     );
     if (!r.ok) throw new Error(r.statusText);
     const j = await r.json();
@@ -144,8 +158,7 @@ const GitHubAPI = {
   async fetchLastCommit(owner, repo, branch) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}/commits/${branch}`,
-      owner,
-      { headers: this.getHeaders(owner) }
+      owner
     );
     if (!r.ok) throw new Error(r.statusText);
     const j = await r.json();
@@ -156,8 +169,7 @@ const GitHubAPI = {
     const owner = this.currentRepo?.owner;
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${this.currentRepo.owner}/${this.currentRepo.repo}/contents/${encodeURIComponent(path)}?ref=${this.currentRepo.branch}`,
-      owner,
-      { headers: this.getHeaders(owner) }
+      owner
     );
     if (!r.ok) throw new Error(r.statusText);
     const j = await r.json();
@@ -168,8 +180,7 @@ const GitHubAPI = {
   async fetchTree(owner, repo, branch) {
     const { response: r, authError } = await this.fetchWithFallback(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-      owner,
-      { headers: this.getHeaders(owner) }
+      owner
     );
     if (!r.ok) throw new Error(r.statusText);
     return { tree: await r.json(), authError };
