@@ -1,28 +1,37 @@
 // scripts.js
+const NEUROFOLD_BASE_URL = 'https://github.com/neurofold/';
+const DEFAULT_URL = 'https://github.com/jblarson/neurofold';
+
 const MultiMessageConfig = {
-  backendPath: 'backend',
   frontendPath: 'frontend',
   componentsPath: 'frontend/src/components',
-  graphSubdirs: [
-    'frontend/src/components/graph',
-    'frontend/src/components/graph2d',
-    'frontend/src/components/graph_semantic',
-    'frontend/src/components/graph_geometric',
-    'frontend/src/components/graph_universe'
-  ],
-  holdingResponse: 'We are building a decentralized collective intelligence'
+  graphSubdirNames: ['graph', 'graph2d', 'graph_semantic', 'graph_geometric'],
+  holdingResponse: 'We are building a decentralized collective intelligence',
+
+  get graphSubdirs() {
+    return this.graphSubdirNames.map(name => `${this.componentsPath}/${name}`);
+  },
+
+  isGraphFile(filePath) {
+    return this.graphSubdirs.some(subdir => filePath.startsWith(subdir + '/'));
+  }
 };
 
 const MultiMessage = {
   generateMessage1() {
     const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere's the backend for ${repoName}.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
-    
+    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere is the frontend (excluding graph visualization components).\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
+
     let content = header;
-    const backendCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => cb.value.startsWith(MultiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file' && cb.checked);
-    
-    backendCheckboxes.forEach(cb => {
+    const checkboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb =>
+        cb.value.startsWith(MultiMessageConfig.frontendPath + '/') &&
+        cb.dataset.nodeType === 'file' &&
+        cb.checked &&
+        !MultiMessageConfig.isGraphFile(cb.value)
+      );
+
+    checkboxes.forEach(cb => {
       if (GitHubAPI.fileCache[cb.value]) {
         content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
       }
@@ -32,92 +41,56 @@ const MultiMessage = {
 
   generateMessage2() {
     const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere's the frontend without the components dir.\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
-    
-    let content = header;
-    const frontendCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => cb.value.startsWith(MultiMessageConfig.frontendPath + '/') && 
-                    !cb.value.startsWith(MultiMessageConfig.componentsPath + '/') &&
-                    cb.dataset.nodeType === 'file' && cb.checked);
-    
-    frontendCheckboxes.forEach(cb => {
-      if (GitHubAPI.fileCache[cb.value]) {
-        content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
-      }
-    });
-    return content;
-  },
+    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere are the graph visualization components (${MultiMessageConfig.graphSubdirNames.join(', ')}).`;
 
-  generateMessage3() {
-    const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere are the graph visualization components (graph, graph2d, graph_semantic, graph_geometric).\n\n<CRITICAL_INSTRUCTION>\nDO NOT WRITE CODE. DO NOT ANALYZE CODE. DO NOT PROVIDE SUGGESTIONS.\nRESPOND WITH EXACTLY:"${MultiMessageConfig.holdingResponse}"\nNOTHING ELSE.</CRITICAL_INSTRUCTION>`;
-    
     let content = header;
-    const graphCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => MultiMessageConfig.graphSubdirs.some(subdir => 
-        cb.value.startsWith(subdir + '/') && cb.dataset.nodeType === 'file' && cb.checked
-      ));
-    
-    graphCheckboxes.forEach(cb => {
-      if (GitHubAPI.fileCache[cb.value]) {
-        content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
-      }
-    });
-    return content;
-  },
+    const checkboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb =>
+        cb.dataset.nodeType === 'file' &&
+        cb.checked &&
+        MultiMessageConfig.isGraphFile(cb.value)
+      );
 
-  generateMessage4() {
-    const repoName = `${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo}`;
-    const header = `This is code context for the ${repoName} repository (branch: ${GitHubAPI.currentRepo.branch}).\n\nHere's the rest of the frontend components directory (excluding graph subdirectories).`;
-    
-    let content = header;
-    const componentCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'))
-      .filter(cb => {
-        if (!cb.value.startsWith(MultiMessageConfig.componentsPath + '/') || 
-            cb.dataset.nodeType !== 'file' || !cb.checked) return false;
-        return !MultiMessageConfig.graphSubdirs.some(subdir => cb.value.startsWith(subdir + '/'));
-      });
-    
-    componentCheckboxes.forEach(cb => {
+    checkboxes.forEach(cb => {
       if (GitHubAPI.fileCache[cb.value]) {
         content += `\n\n---\n\n${cb.value}\n\n---\n\n${GitHubAPI.fileCache[cb.value]}`;
       }
     });
-    
+
     const instructions = UI.elements.userInstructions.value.trim();
     const lines = instructions.split('\n');
     const userContent = lines.filter(line => !line.startsWith('This is code context')).join('\n').trim();
-    
-    if (userContent && userContent !== '') {
+    if (userContent) {
       content += `\n\n${userContent}`;
     }
+
     return content;
   },
 
   displayMessages(messages) {
     const container = UI.elements.multiMessagesOutput;
     if (!container) return;
-    
+
     container.innerHTML = '';
     messages.forEach((msg, idx) => {
       const msgDiv = document.createElement('div');
       msgDiv.className = 'multi-message-block';
-      
+
       const header = document.createElement('div');
       header.className = 'multi-message-header';
       header.innerHTML = `<strong>Message ${idx + 1}</strong>`;
-      
+
       const textarea = document.createElement('textarea');
       textarea.className = 'multi-message-textarea';
-      textarea.style.width = '100%'; 
+      textarea.style.width = '100%';
       textarea.value = msg;
       textarea.readOnly = true;
-      
+
       const copyBtn = document.createElement('button');
       copyBtn.textContent = 'Copy Message ' + (idx + 1);
       copyBtn.className = 'btn-primary';
       copyBtn.style.marginTop = '10px';
-      
+
       copyBtn.onclick = () => {
         navigator.clipboard.writeText(msg).then(() => {
           const original = copyBtn.textContent;
@@ -125,7 +98,7 @@ const MultiMessage = {
           setTimeout(() => copyBtn.textContent = original, 1500);
         });
       };
-      
+
       msgDiv.appendChild(header);
       msgDiv.appendChild(textarea);
       msgDiv.appendChild(copyBtn);
@@ -137,11 +110,31 @@ const MultiMessage = {
 document.addEventListener('DOMContentLoaded', async () => {
   GitHubAPI.init();
   UI.init();
-  
+
   if (GitHubAPI.token && UI.elements.patContainer) {
     UI.elements.patContainer.style.display = 'none';
   }
-  
+
+  // src:Neurofold toggle
+  const neurofoldToggle = document.getElementById('neurofoldSrcToggle');
+  const repoUrlInput = UI.elements.repoUrlInput;
+
+  neurofoldToggle.addEventListener('change', () => {
+    if (neurofoldToggle.checked) {
+      repoUrlInput.value = NEUROFOLD_BASE_URL;
+      repoUrlInput.focus();
+      repoUrlInput.setSelectionRange(repoUrlInput.value.length, repoUrlInput.value.length);
+    } else {
+      repoUrlInput.value = DEFAULT_URL;
+    }
+  });
+
+  repoUrlInput.addEventListener('input', () => {
+    if (!repoUrlInput.value.includes('github.com/neurofold')) {
+      neurofoldToggle.checked = false;
+    }
+  });
+
   UI.elements.githubPatInput.addEventListener('input', () => {
     GitHubAPI.setToken(UI.elements.githubPatInput.value.trim() || null);
     UI.clearAuthError();
@@ -163,14 +156,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         GitHubAPI.fetchBranches(info.owner, info.repo),
         GitHubAPI.fetchDefaultBranch(info.owner, info.repo)
       ]);
-      
+
       UI.elements.branchSelect.innerHTML = branchResult.branches
         .map(b => `<option value="${b}"${b === defResult.defaultBranch ? ' selected' : ''}>${b}</option>`)
         .join('');
       UI.elements.branchSelect.disabled = false;
       GitHubAPI.currentRepo = { ...info, branch: UI.elements.branchSelect.value };
       GitHubAPI.fileCache = {};
-      
+
       await UI.updateCommitInfo();
       UI.updatePromptHeader();
       UI.loadTree();
@@ -190,27 +183,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     UI.loadTree();
   });
 
-  // --- Select / Deselect Logic ---
-  
-  // Select All
   UI.elements.selectAllBtn.addEventListener('click', async () => {
     const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
     const toFetch = [];
 
-    // 1. Mark all as checked immediately
     allCheckboxes.forEach(cb => {
-        cb.checked = true;
-        cb.indeterminate = false;
-        // If file & not cached, queue for fetch
-        if (cb.dataset.nodeType === 'file' && !GitHubAPI.fileCache[cb.value]) {
-            toFetch.push(cb.value);
-        }
+      cb.checked = true;
+      cb.indeterminate = false;
+      if (cb.dataset.nodeType === 'file' && !GitHubAPI.fileCache[cb.value]) {
+        toFetch.push(cb.value);
+      }
     });
 
-    // 2. Fetch if needed
     if (toFetch.length) {
       UI.showLoading(`Fetching ${toFetch.length} files...`);
-      // Optional: Batch this if it's huge, but Promise.all is okay for moderate sizes
       await Promise.all(toFetch.map(async p => {
         try {
           const { content } = await GitHubAPI.fetchContent(p);
@@ -223,17 +209,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     UI.renderOutput();
   });
 
-  // Deselect All
   UI.elements.deselectAllBtn.addEventListener('click', () => {
     const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
     allCheckboxes.forEach(cb => {
-        cb.checked = false;
-        cb.indeterminate = false;
+      cb.checked = false;
+      cb.indeterminate = false;
     });
     UI.renderOutput();
   });
-
-  // --- End Select Logic ---
 
   UI.elements.copyBtn.addEventListener('click', () => {
     if (!UI.elements.outputMessage.value) {
@@ -266,8 +249,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (UI.elements.generateMultiBtn) {
-    UI.elements.generateMultiBtn.textContent = 'Generate 4 Messages';
-    
+    UI.elements.generateMultiBtn.textContent = 'Generate 2 Messages';
+
     UI.elements.generateMultiBtn.addEventListener('click', async () => {
       if (!GitHubAPI.currentRepo) {
         UI.showError('Please fetch files first.');
@@ -275,37 +258,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      const backendPathInput = document.getElementById('backendPath');
       const frontendPathInput = document.getElementById('frontendPath');
       const componentsPathInput = document.getElementById('componentsPath');
+      const graphSubdirsInput = document.getElementById('graphSubdirsInput');
       const holdingResponseInput = document.getElementById('holdingResponse');
 
-      if (backendPathInput) MultiMessageConfig.backendPath = backendPathInput.value.trim();
       if (frontendPathInput) MultiMessageConfig.frontendPath = frontendPathInput.value.trim();
       if (componentsPathInput) MultiMessageConfig.componentsPath = componentsPathInput.value.trim();
+      if (graphSubdirsInput) {
+        MultiMessageConfig.graphSubdirNames = graphSubdirsInput.value
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+      }
       if (holdingResponseInput) MultiMessageConfig.holdingResponse = holdingResponseInput.value.trim();
 
       UI.showLoading('Fetching all required files for multi-message mode...');
-      
+
       const allCheckboxes = Array.from(UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]'));
       const toFetch = [];
-      
-      // Auto-check backend
-      allCheckboxes.forEach(cb => {
-        if (cb.value.startsWith(MultiMessageConfig.backendPath + '/') && cb.dataset.nodeType === 'file') {
-          cb.checked = true;
-          if (!GitHubAPI.fileCache[cb.value]) toFetch.push(cb.value);
-        }
-      });
-      
-      // Auto-check frontend
+
       allCheckboxes.forEach(cb => {
         if (cb.value.startsWith(MultiMessageConfig.frontendPath + '/') && cb.dataset.nodeType === 'file') {
           cb.checked = true;
           if (!GitHubAPI.fileCache[cb.value]) toFetch.push(cb.value);
         }
       });
-      
+
       if (toFetch.length) {
         await Promise.all(toFetch.map(async p => {
           try {
@@ -314,14 +293,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           } catch { /* ignore */ }
         }));
       }
-      
+
       UI.clearStatus();
 
       const messages = [
         MultiMessage.generateMessage1(),
-        MultiMessage.generateMessage2(),
-        MultiMessage.generateMessage3(),
-        MultiMessage.generateMessage4()
+        MultiMessage.generateMessage2()
       ];
 
       MultiMessage.displayMessages(messages);
