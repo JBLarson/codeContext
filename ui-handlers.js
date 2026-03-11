@@ -1,7 +1,7 @@
 // ui-handlers.js
 const UI = {
   elements: {},
-  
+
   init() {
     this.elements = {
       repoUrlInput: document.getElementById('repoUrl'),
@@ -11,7 +11,7 @@ const UI = {
       commitInfo: document.getElementById('commitInfo'),
       fetchFilesBtn: document.getElementById('fetchFilesBtn'),
       selectAllBtn: document.getElementById('selectAllBtn'),
-      deselectAllBtn: document.getElementById('deselectAllBtn'), // New
+      deselectAllBtn: document.getElementById('deselectAllBtn'),
       fileListContainer: document.getElementById('fileListContainer'),
       userInstructions: document.getElementById('userInstructions'),
       outputMessage: document.getElementById('outputMessage'),
@@ -26,33 +26,33 @@ const UI = {
       advancedPathsConfig: document.getElementById('advancedPathsConfig'),
       multiMessagesOutput: document.getElementById('multiMessagesOutput')
     };
-    
+
     if (GitHubAPI.token && this.elements.patContainer) {
       this.elements.patContainer.style.display = 'none';
     }
   },
-  
+
   showLoading(msg) {
     this.elements.statusMessages.innerHTML = `<div class="message-area loading-message">${msg}</div>`;
   },
-  
+
   showError(msg) {
     this.elements.statusMessages.innerHTML = `<div class="message-area error-message">${msg}</div>`;
   },
-  
+
   clearStatus() {
     this.elements.statusMessages.innerHTML = '';
   },
-  
+
   showAuthError(msg) {
     this.elements.authErrorMessage.textContent = msg;
     this.elements.authErrorContainer.style.display = 'block';
   },
-  
+
   clearAuthError() {
     this.elements.authErrorContainer.style.display = 'none';
   },
-  
+
   buildTree(items) {
     const root = { children: {} };
     items.filter(i => i.type === 'blob' || i.type === 'tree')
@@ -72,11 +72,11 @@ const UI = {
       });
     return root;
   },
-  
+
   isImageFile(name) {
     return /\.(png|jpe?g|gif|bmp|svg|webp|ico|tif|tiff)$/i.test(name);
   },
-  
+
   renderTree(node, container) {
     if (!node.children) return;
     const ul = document.createElement('ul');
@@ -88,7 +88,7 @@ const UI = {
     }).forEach(c => ul.appendChild(this.nodeToElement(c)));
     container.appendChild(ul);
   },
-  
+
   nodeToElement(n) {
     const li = document.createElement('li');
     li.className = `file-tree-node node-type-${n.type}`;
@@ -154,14 +154,12 @@ const UI = {
     }
     return li;
   },
-  
+
   async onFileChange(e) {
     const cb = e.target, path = cb.value, li = cb.closest('.file-tree-node');
     if (cb.checked && !GitHubAPI.fileCache[path]) {
-      // Show local loader
       const loader = li.querySelector('.loading-indicator');
       if (loader) loader.style.display = 'inline';
-      
       try {
         const { content, authError } = await GitHubAPI.fetchContent(path);
         GitHubAPI.fileCache[path] = content;
@@ -174,6 +172,9 @@ const UI = {
     }
     this.renderOutput();
     this.updateParents(cb);
+    // Keep workspace fileCache in sync
+    const ws = WorkspaceManager.getActive();
+    if (ws) ws.fileCache = { ...GitHubAPI.fileCache };
   },
 
   async onDirChange(e) {
@@ -186,7 +187,7 @@ const UI = {
         toFetch.push(cb.value);
       }
     });
-    
+
     if (toFetch.length) {
       this.showLoading(`Fetching ${toFetch.length} files...`);
       await Promise.all(toFetch.map(async p => {
@@ -200,6 +201,9 @@ const UI = {
     }
     this.renderOutput();
     this.updateParents(dirCb);
+    // Keep workspace fileCache in sync
+    const ws = WorkspaceManager.getActive();
+    if (ws) ws.fileCache = { ...GitHubAPI.fileCache };
   },
 
   updateParents(cb) {
@@ -216,7 +220,7 @@ const UI = {
       ul = pLi.closest('ul');
     }
   },
-  
+
   renderOutput() {
     let out = this.elements.userInstructions.value || '';
     this.elements.fileListContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
@@ -225,12 +229,16 @@ const UI = {
       }
     });
     this.elements.outputMessage.value = out;
+
+    // Keep workspace output in sync
+    const ws = WorkspaceManager.getActive();
+    if (ws) ws.output = out;
   },
 
   updatePromptHeader() {
     if (!GitHubAPI.currentRepo) return;
     const header = `This is code context for the ${GitHubAPI.currentRepo.owner}/${GitHubAPI.currentRepo.repo} repository (branch: ${GitHubAPI.currentRepo.branch}).`;
-    const suffix = "RESPOND WITH COMPLETE FILES";
+    const suffix = "WRITE COMPLETE FILES - DO NOT OMIT CODE";
     const headerPrefix = "This is code context for the";
 
     let currentVal = this.elements.userInstructions.value;
@@ -265,13 +273,13 @@ const UI = {
       this.elements.commitInfo.textContent = '';
     }
   },
-  
+
   async loadTree() {
     this.showLoading(`Fetching tree (${GitHubAPI.currentRepo.branch})...`);
     this.elements.fetchFilesBtn.disabled = true;
     this.elements.selectAllBtn.disabled = true;
     this.elements.deselectAllBtn.disabled = true;
-    
+
     this.elements.fileListContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:20px;">Fetching file list...</p>';
     try {
       const { tree: data, authError } = await GitHubAPI.fetchTree(
@@ -279,9 +287,9 @@ const UI = {
         GitHubAPI.currentRepo.repo,
         GitHubAPI.currentRepo.branch
       );
-      
+
       if (authError) this.showAuthError(authError);
-      
+
       this.elements.fileListContainer.innerHTML = '';
       if (data.truncated) {
         this.elements.fileListContainer.innerHTML = `<div class="message-area warning-message">File list truncated (repo is huge).</div>`;
@@ -289,10 +297,12 @@ const UI = {
       if (!data.tree || !data.tree.length) {
         this.elements.fileListContainer.innerHTML += '<p>No files found.</p>';
       } else {
+        // Store raw tree data in workspace before rendering
+        WorkspaceManager.setTreeData(data);
+
         const tree = this.buildTree(data.tree);
         this.renderTree(tree, this.elements.fileListContainer);
-        
-        // Enable both buttons now that we have files
+
         this.elements.selectAllBtn.disabled = false;
         this.elements.deselectAllBtn.disabled = false;
       }

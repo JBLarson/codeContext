@@ -9,14 +9,130 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    /* --- Tab Bar --- */
+    #tabBarContainer {
+      margin-bottom: 28px;
+    }
+
+    .tab-strip {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .tab-strip::-webkit-scrollbar { display: none; }
+
+    .tab-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: none;
+      position: relative;
+      bottom: -1px;
+      transition: background 0.15s, border-color 0.15s;
+      min-width: 0;
+      max-width: 220px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .tab-item:hover:not(.tab-active) {
+      background: rgba(255,255,255,0.03);
+      border-color: var(--border-subtle);
+    }
+
+    .tab-active {
+      background: var(--glass-panel);
+      border-color: var(--border-subtle);
+      border-bottom-color: var(--glass-panel);
+    }
+
+    .tab-active .tab-label {
+      color: var(--text-main);
+    }
+
+    .tab-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .tab-rename-input {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      background: var(--input-bg);
+      border: 1px solid var(--primary);
+      color: var(--text-main);
+      padding: 2px 6px;
+      border-radius: 3px;
+      width: 140px;
+      outline: none;
+    }
+
+    .tab-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0 2px;
+      flex-shrink: 0;
+      transition: color 0.15s;
+      display: flex;
+      align-items: center;
+    }
+
+    .tab-close:hover { color: #fca5a5; }
+
+    .tab-add {
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-bottom: none;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      color: var(--text-dim);
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+      bottom: -1px;
+      flex-shrink: 0;
+    }
+
+    .tab-add:hover {
+      color: var(--primary);
+      background: var(--primary-dim);
+      border-color: var(--primary);
+    }
+
+    /* --- Repo URL row --- */
     .repo-url-row {
       display: flex;
       align-items: center;
       gap: 12px;
     }
+
     .repo-url-row input[type="text"] {
       flex: 1;
     }
+
     .neurofold-toggle {
       display: flex;
       align-items: center;
@@ -24,6 +140,7 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
+
     .neurofold-toggle input[type="checkbox"] {
       appearance: none;
       width: 14px;
@@ -35,10 +152,12 @@
       position: relative;
       flex-shrink: 0;
     }
+
     .neurofold-toggle input[type="checkbox"]:checked {
       background: var(--primary);
       border-color: var(--primary);
     }
+
     .neurofold-toggle input[type="checkbox"]:checked::after {
       content: '✓';
       position: absolute;
@@ -49,6 +168,7 @@
       transform: translate(-50%, -50%);
       font-weight: bold;
     }
+
     .neurofold-toggle label {
       font-size: 11px;
       font-weight: 600;
@@ -64,6 +184,9 @@
   <div class="container">
     <h1>codeContext</h1>
 
+    <!-- Tab Bar -->
+    <div id="tabBarContainer"></div>
+
     <div id="authErrorContainer" style="display: none;">
       <div class="message-area error-message">
         <strong>Authentication Error:</strong> <span id="authErrorMessage" style="margin-left:8px;"></span>
@@ -76,24 +199,24 @@
     </div>
 
     <div class="grid-2-1">
-        <div class="form-group">
-          <label for="repoUrl">GitHub Repository URL</label>
-          <div class="repo-url-row">
-            <div class="neurofold-toggle">
-              <label for="neurofoldSrcToggle">src:Org</label>
-              <input type="checkbox" id="neurofoldSrcToggle" />
-            </div>
-            <input type="text" id="repoUrl" value="https://github.com/jblarson/neurofold" />
+      <div class="form-group">
+        <label for="repoUrl">GitHub Repository URL</label>
+        <div class="repo-url-row">
+          <input type="text" id="repoUrl" value="https://github.com/jblarson/neurofold" />
+          <div class="neurofold-toggle">
+            <input type="checkbox" id="neurofoldSrcToggle" />
+            <label for="neurofoldSrcToggle">src:Neurofold</label>
           </div>
         </div>
+      </div>
 
-        <div class="form-group">
-          <label for="branchSelect">Branch</label>
-          <select id="branchSelect" disabled>
-            <option>Pending...</option>
-          </select>
-          <div id="commitInfo" style="margin-top: 6px; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);"></div>
-        </div>
+      <div class="form-group">
+        <label for="branchSelect">Branch</label>
+        <select id="branchSelect" disabled>
+          <option>Pending...</option>
+        </select>
+        <div id="commitInfo" style="margin-top: 6px; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);"></div>
+      </div>
     </div>
 
     <div class="button-group">
@@ -106,11 +229,11 @@
       <div class="utility-controls">
         <label style="margin-bottom:0;">Repository Content</label>
         <div class="action-bar">
-           <button id="selectAllBtn" class="btn-utility" disabled>Select</button>
-           <button id="deselectAllBtn" class="btn-utility" disabled>Deselect</button>
+          <button id="selectAllBtn" class="btn-utility" disabled>Select</button>
+          <button id="deselectAllBtn" class="btn-utility" disabled>Deselect</button>
         </div>
       </div>
-      
+
       <div id="fileListContainer">
         <div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-dim);">
           Enter URL and fetch to load file tree.
@@ -139,20 +262,20 @@
         <label for="holdingResponse">Holding Response Trigger</label>
         <input type="text" id="holdingResponse" value="We are building a decentralized collective intelligence" />
       </div>
-      
+
       <div class="form-group">
         <label style="display: flex; align-items: center; cursor: pointer; color: var(--text-main);">
           <input type="checkbox" id="advancedPathsToggle" style="width: auto; margin-right: 12px;">
           Advanced Path Configuration
         </label>
       </div>
-      
+
       <div id="advancedPathsConfig" style="display: none; padding-left: 20px; border-left: 1px solid var(--border-subtle); margin-top: 15px;">
         <div class="form-group">
           <label for="frontendPath">Frontend Path</label>
           <input type="text" id="frontendPath" value="frontend" />
         </div>
-        
+
         <div class="form-group">
           <label for="componentsPath">Components Path</label>
           <input type="text" id="componentsPath" value="frontend/src/components" />
@@ -163,11 +286,11 @@
           <input type="text" id="graphSubdirsInput" value="graph,graph2d,graph_semantic,graph_geometric" />
         </div>
       </div>
-      
+
       <div class="button-group">
         <button id="generateMultiBtn" class="btn-primary">Generate Messages</button>
       </div>
-      
+
       <div id="multiMessagesOutput"></div>
     </div>
 
@@ -186,6 +309,8 @@
   <script src="token.js"></script>
   <script src="github-api.js"></script>
   <script src="ui-handlers.js"></script>
+  <script src="workspace-manager.js"></script>
+  <script src="tab-bar.js"></script>
   <script src="scripts.js"></script>
 
 </body>

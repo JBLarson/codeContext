@@ -1,4 +1,5 @@
 // scripts.js
+
 const NEUROFOLD_BASE_URL = 'https://github.com/neurofold/';
 const DEFAULT_URL = 'https://github.com/jblarson/neurofold';
 
@@ -111,11 +112,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   GitHubAPI.init();
   UI.init();
 
+  // --- Workspace / Tab initialization ---
+  const restored = WorkspaceManager.load();
+  if (!restored || WorkspaceManager.workspaces.length === 0) {
+    WorkspaceManager.create('New Tab');
+    WorkspaceManager.activeId = WorkspaceManager.workspaces[0].id;
+  }
+  TabBar.init();
+
+  // Restore active workspace into DOM on load
+  const activeWs = WorkspaceManager.getActive();
+  if (activeWs) {
+    WorkspaceManager.restoreInto(activeWs);
+  }
+
+  // Snapshot on visibility change (browser tab switch, etc.)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      WorkspaceManager.snapshotActive();
+    }
+  });
+
+  // Auto-snapshot every 30s as fallback
+  setInterval(() => WorkspaceManager.snapshotActive(), 30000);
+
+  // --- PAT ---
   if (GitHubAPI.token && UI.elements.patContainer) {
     UI.elements.patContainer.style.display = 'none';
   }
 
-  // src:Neurofold toggle
+  // --- src:Neurofold toggle ---
   const neurofoldToggle = document.getElementById('neurofoldSrcToggle');
   const repoUrlInput = UI.elements.repoUrlInput;
 
@@ -135,13 +161,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // --- PAT input ---
   UI.elements.githubPatInput.addEventListener('input', () => {
     GitHubAPI.setToken(UI.elements.githubPatInput.value.trim() || null);
     UI.clearAuthError();
   });
 
-  UI.elements.userInstructions.addEventListener('input', () => UI.renderOutput());
+  // --- Instructions ---
+  UI.elements.userInstructions.addEventListener('input', () => {
+    UI.renderOutput();
+    const ws = WorkspaceManager.getActive();
+    if (ws) ws.instructions = UI.elements.userInstructions.value;
+  });
 
+  // --- Fetch Files ---
   UI.elements.fetchFilesBtn.addEventListener('click', async () => {
     UI.clearStatus();
     UI.clearAuthError();
@@ -151,6 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     UI.showLoading('Loading branches...');
     UI.elements.branchSelect.disabled = true;
+
     try {
       const [branchResult, defResult] = await Promise.all([
         GitHubAPI.fetchBranches(info.owner, info.repo),
@@ -164,6 +198,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       GitHubAPI.currentRepo = { ...info, branch: UI.elements.branchSelect.value };
       GitHubAPI.fileCache = {};
 
+      // Update workspace state
+      const ws = WorkspaceManager.getActive();
+      if (ws) {
+        ws.owner = info.owner;
+        ws.repo = info.repo;
+        ws.branch = UI.elements.branchSelect.value;
+        ws.branches = branchResult.branches;
+        ws.repoUrl = url;
+        ws.fileCache = {};
+        ws.selectedPaths = new Set();
+        ws.expandedDirs = new Set();
+        ws.treeData = null;
+      }
+
+      // Auto-label the tab from repo info
+      TabBar.updateActiveLabel(info.owner, info.repo);
+
       await UI.updateCommitInfo();
       UI.updatePromptHeader();
       UI.loadTree();
@@ -174,15 +225,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // --- Branch change ---
   UI.elements.branchSelect.addEventListener('change', async () => {
     if (!GitHubAPI.currentRepo) return;
     GitHubAPI.currentRepo.branch = UI.elements.branchSelect.value;
     GitHubAPI.fileCache = {};
+
+    const ws = WorkspaceManager.getActive();
+    if (ws) {
+      ws.branch = UI.elements.branchSelect.value;
+      ws.fileCache = {};
+      ws.selectedPaths = new Set();
+      ws.expandedDirs = new Set();
+      ws.treeData = null;
+    }
+
     await UI.updateCommitInfo();
     UI.updatePromptHeader();
     UI.loadTree();
   });
 
+  // --- Select All ---
   UI.elements.selectAllBtn.addEventListener('click', async () => {
     const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
     const toFetch = [];
@@ -201,14 +264,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
           const { content } = await GitHubAPI.fetchContent(p);
           GitHubAPI.fileCache[p] = content;
-        } catch { /* ignore individual fail */ }
+        } catch { /* ignore */ }
       }));
       UI.clearStatus();
     }
 
+    const ws = WorkspaceManager.getActive();
+    if (ws) ws.fileCache = { ...GitHubAPI.fileCache };
+
     UI.renderOutput();
   });
 
+  // --- Deselect All ---
   UI.elements.deselectAllBtn.addEventListener('click', () => {
     const allCheckboxes = UI.elements.fileListContainer.querySelectorAll('input[type="checkbox"]');
     allCheckboxes.forEach(cb => {
@@ -218,6 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     UI.renderOutput();
   });
 
+  // --- Copy ---
   UI.elements.copyBtn.addEventListener('click', () => {
     if (!UI.elements.outputMessage.value) {
       UI.showError('Nothing to copy.');
@@ -232,6 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .catch(() => UI.showError('Copy failed.'));
   });
 
+  // --- Multi-mode toggle ---
   if (UI.elements.multiModeToggle) {
     UI.elements.multiModeToggle.addEventListener('change', (e) => {
       if (UI.elements.multiModeConfig) {
@@ -240,6 +309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // --- Advanced paths toggle ---
   if (UI.elements.advancedPathsToggle) {
     UI.elements.advancedPathsToggle.addEventListener('change', (e) => {
       if (UI.elements.advancedPathsConfig) {
@@ -248,6 +318,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // --- Generate Multi Messages ---
   if (UI.elements.generateMultiBtn) {
     UI.elements.generateMultiBtn.textContent = 'Generate 2 Messages';
 
@@ -293,6 +364,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           } catch { /* ignore */ }
         }));
       }
+
+      const ws = WorkspaceManager.getActive();
+      if (ws) ws.fileCache = { ...GitHubAPI.fileCache };
 
       UI.clearStatus();
 
