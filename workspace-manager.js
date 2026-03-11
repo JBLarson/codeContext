@@ -13,16 +13,17 @@ const WorkspaceManager = {
   save() {
     const serializable = this.workspaces.map(ws => ({
       ...ws,
-      // fileCache can be large; persist it per-workspace
+      selectedPaths: [...(ws.selectedPaths instanceof Set ? ws.selectedPaths : [])],
+      expandedDirs: [...(ws.expandedDirs instanceof Set ? ws.expandedDirs : [])],
       fileCache: ws.fileCache || {}
     }));
     try {
       localStorage.setItem(this._storageKey, JSON.stringify(serializable));
       localStorage.setItem(this._activeKey, this.activeId);
     } catch (e) {
-      // localStorage quota exceeded (large fileCaches) — save without cache
+      // localStorage quota exceeded — save without file caches
       try {
-        const slim = this.workspaces.map(ws => ({ ...ws, fileCache: {} }));
+        const slim = serializable.map(ws => ({ ...ws, fileCache: {} }));
         localStorage.setItem(this._storageKey, JSON.stringify(slim));
         localStorage.setItem(this._activeKey, this.activeId);
       } catch {}
@@ -34,7 +35,14 @@ const WorkspaceManager = {
       const raw = localStorage.getItem(this._storageKey);
       const savedId = localStorage.getItem(this._activeKey);
       if (raw) {
-        this.workspaces = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        // Deduplicate by id — keeps first occurrence
+        const seen = new Set();
+        this.workspaces = parsed.filter(ws => {
+          if (!ws.id || seen.has(ws.id)) return false;
+          seen.add(ws.id);
+          return true;
+        });
         // Restore non-serializable runtime state
         this.workspaces.forEach(ws => {
           if (!ws.fileCache) ws.fileCache = {};
@@ -48,7 +56,7 @@ const WorkspaceManager = {
         } else if (this.workspaces.length > 0) {
           this.activeId = this.workspaces[0].id;
         }
-        return true;
+        return this.workspaces.length > 0;
       }
     } catch (e) {}
     return false;

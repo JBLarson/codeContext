@@ -63,6 +63,7 @@ const TabBar = {
       const ws = WorkspaceManager.create('New Tab');
       WorkspaceManager.activeId = ws.id;
       WorkspaceManager.restoreInto(ws);
+      WorkspaceManager.save();
       this.render();
     });
 
